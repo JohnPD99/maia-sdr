@@ -126,6 +126,7 @@ maia-sdr/maia-httpd/target/armv7-unknown-linux-gnueabihf/release/maia-httpd: TOO
 	cd maia-sdr/maia-httpd && \
 	  OPENBLAS_TARGET=armv7 OPENBLAS_HOSTCC=gcc \
 	  OPENBLAS_CC=$(TOOLCHAIN) OPENBLAS_FC=$(TOOLCHAIN_FORTRAN) \
+          BINDGEN_EXTRA_CLANG_ARGS_armv7_unknown_linux_gnueabihf="--sysroot=$(CURDIR)/buildroot/output/host/arm-buildroot-linux-gnueabihf/sysroot" \
           cargo build --release --target armv7-unknown-linux-gnueabihf \
 		--config target.armv7-unknown-linux-gnueabihf.linker=\"$(TOOLCHAIN)\"
 
