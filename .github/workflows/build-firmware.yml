@@ -18,7 +18,7 @@ jobs:
     container:
       image: ghcr.io/maia-sdr/maia-sdr-devel:latest
       volumes:
-        - vivado2022_2:/opt/Xilinx
+        - vivado2023_2:/opt/Xilinx
       options: --user root
     steps:
     - uses: actions/checkout@v4
@@ -33,13 +33,10 @@ jobs:
       # We cannot '.' the main settings.sh file for Vivado, because it uses
       # 'source' to run the sub-files, and we are not using bash. Instead, we
       # '.' each individual sub-file.
-      #
-      # ADI_IGNORE_VERSION_CHECK is required because we use Vivado 2022.2.2
-      # instead of 2022.2.
       run: |
-        . /opt/Xilinx/Vitis/2022.2/.settings64-Vitis.sh
-        . /opt/Xilinx/Vivado/2022.2/.settings64-Vivado.sh
-        . /opt/Xilinx/Vitis_HLS/2022.2/.settings64-Vitis_HLS.sh
+        . /opt/Xilinx/Vitis/2023.2/.settings64-Vitis.sh
+        . /opt/Xilinx/Vivado/2023.2/.settings64-Vivado.sh
+        . /opt/Xilinx/Vitis_HLS/2023.2/.settings64-Vitis_HLS.sh
         . /opt/rust/env
         export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin/:/usr/bin:/sbin:/bin:$PATH:/opt/oss-cad-suite/bin
         export PYTHONPATH=/usr/local/lib/python3.10/dist-packages
