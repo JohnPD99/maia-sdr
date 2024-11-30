@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2024-11-30
+
+### Added
+
+- Scripts to generate SSL certificates on boot in the JFFS2 partition.
+
+### Changed
+
+- Update Maia SDR to v0.10.0. Adds geolocation and HTTPS support.
+- Update base ADI Pluto firmware to v0.39.
+
 ## [0.7.0] - 2024-10-12
 
 ### Changed
@@ -98,7 +109,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial release of the Maia SDR ADALM Pluto firmware. This corresponds to the
 [default ADI firmware v0.35](https://github.com/analogdevicesinc/plutosdr-fw/releases/tag/v0.35).
 
-[unreleased]: https://github.com/maia-sdr/plutosdr-fw/compare/maia-sdr-v0.7.0...HEAD
+[unreleased]: https://github.com/maia-sdr/plutosdr-fw/compare/maia-sdr-v0.8.0...HEAD
+[0.8.0]: https://github.com/maia-sdr/plutosdr-fw/compare/maia-sdr-v0.7.0...maia-sdr-v0.8.0
 [0.7.0]: https://github.com/maia-sdr/plutosdr-fw/compare/maia-sdr-v0.6.1...maia-sdr-v0.7.0
 [0.6.1]: https://github.com/maia-sdr/plutosdr-fw/compare/maia-sdr-v0.6.0...maia-sdr-v0.6.1
 [0.6.0]: https://github.com/maia-sdr/plutosdr-fw/compare/maia-sdr-v0.5.0...maia-sdr-v0.6.0
