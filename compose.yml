@@ -2,6 +2,8 @@ services:
   build:
     image: ghcr.io/maia-sdr/maia-sdr-devel:latest
     pull_policy: always
+    # Vivado segfaults when network_mode: "host" is omitted
+    network_mode: "host"
     volumes:
       - vivado2023_2:/opt/Xilinx
       - type: bind
