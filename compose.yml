@@ -1,0 +1,22 @@
+services:
+  build:
+    image: ghcr.io/maia-sdr/maia-sdr-devel:latest
+    pull_policy: always
+    volumes:
+      - vivado2023_2:/opt/Xilinx
+      - type: bind
+        source: $PWD
+        target: /w
+    environment:
+      - TARGET
+    entrypoint: /w/build-docker.sh
+    user: $DOCKER_USER
+    # https://github.com/moby/moby/issues/45436#issuecomment-1528752777
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 1048576
+
+volumes:
+  vivado2023_2:
+    external: true

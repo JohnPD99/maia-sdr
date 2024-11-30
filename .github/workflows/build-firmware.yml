@@ -6,8 +6,6 @@ on:
     tags:
       - maia-sdr-*
 
-# TODO: refactor this as a workflow_call action
-
 jobs:
   build-firmware:
     strategy:
@@ -15,38 +13,13 @@ jobs:
         target: [pluto, plutoplus]
     name: Build firmware
     runs-on: [self-hosted, vivado]
-    container:
-      image: ghcr.io/maia-sdr/maia-sdr-devel:latest
-      volumes:
-        - vivado2023_2:/opt/Xilinx
-      options: --user root
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: Build firmware
-      # xsct, which is run by the make process, uses Xvfb, which usually needs a
-      # connection to an X server (even though it is a CLI application). We run
-      # Xvfb in the container to create a "fake" X session that makes xsct
-      # happy.
-      #
-      # We cannot '.' the main settings.sh file for Vivado, because it uses
-      # 'source' to run the sub-files, and we are not using bash. Instead, we
-      # '.' each individual sub-file.
       run: |
-        . /opt/Xilinx/Vitis/2023.2/.settings64-Vitis.sh
-        . /opt/Xilinx/Vivado/2023.2/.settings64-Vivado.sh
-        . /opt/Xilinx/Vitis_HLS/2023.2/.settings64-Vitis_HLS.sh
-        . /opt/rust/env
-        export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin/:/usr/bin:/sbin:/bin:$PATH:/opt/oss-cad-suite/bin
-        export PYTHONPATH=/usr/local/lib/python3.10/dist-packages
-        apt-get update
-        DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb
-        Xvfb :10 &
-        export DISPLAY=:10
-        export ADI_IGNORE_VERSION_CHECK=1
-        export TARGET=${{matrix.target}}
-        make
+        DOCKER_USER="$(id -u):$(id -g)" TARGET=${{matrix.target}} docker compose run --rm build
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -55,7 +28,6 @@ jobs:
           build/*-fw-*.zip
           build/*-jtag-bootstrap-*.zip
           build/system_top.xsa
-        if-no-files-found: error
     # The working directory in the self-hosted runner needs be cleaned before
     # building. We use if: ${{ always() }} to clean even if the build fails.
     - name: Clean up runner working dir
