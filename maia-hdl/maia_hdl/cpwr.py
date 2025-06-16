@@ -16,6 +16,7 @@ from .pluto_platform import PlutoPlatform
 class Cpwr(Elaboratable):
     def __init__(self, width, add_width=0, add_shift=0, add_latency=0,
                  truncate=0):
+        #will be changed
         """Complex power
 
         This module uses 2 multipliers in pipeline to compute the power
