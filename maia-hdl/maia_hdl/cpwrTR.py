@@ -69,7 +69,7 @@ class CpwrTR(Elaboratable):
         self.real_width = real_width
         self.real_shift = real_shift
         self.truncate = truncate
-
+        # test
         self.common_edge = Signal()
         self.clken = Signal()
         self.re_in = Signal(signed(self.w))
@@ -246,7 +246,7 @@ class CpwrTR(Elaboratable):
                 m.d.sync += output_delay[i].eq(output_delay[i-1]),
                 #self.is_greater.eq(is_greater_prev),
             m.d.sync += self.out.eq(output_delay[-1])
-            
+
         m.d.comb += [
             port_a.eq(self.im_in),
             port_b.eq(self.im_in),
