@@ -23,6 +23,7 @@ from .pluto_platform import PlutoPlatform
 from .register import Access, Field, Registers, Register, RegisterMap
 from .recorder import Recorder16IQ, RecorderMode
 from .spectrometer import Spectrometer
+from .kurtosis_spectrometer import Kurthosis_Spectrometer
 
 # IP core version
 _version = '0.6.2'
@@ -515,7 +516,7 @@ class TRTSDR(Elaboratable):
                 ]),
             },
             1)
-        self.spectrometer = Spectrometer(
+        self.spectrometer = Kurthosis_Spectrometer(
             config.spectrometer_address,
             config.spectrometer_buffers.bit_length() - 1,
             dma_name='m_axi_spectrometer')
@@ -742,8 +743,6 @@ class TRTSDR(Elaboratable):
                 self.sdr_registers['spectrometer']['num_integrations']),
             self.spectrometer.abort.eq(
                 self.sdr_registers['spectrometer']['abort']),
-            self.spectrometer.peak_detect.eq(
-                self.sdr_registers['spectrometer']['peak_detect']),
             self.sdr_registers['spectrometer']['last_buffer'].eq(
                 self.spectrometer.last_buffer),
         ]
