@@ -95,52 +95,51 @@ class CpwrTR(Elaboratable):
 
         # Pure Amaranth design. Vivado doesn't infer a single DSP48E1
         # from this.
-        # m = Module()
-        # reg_a1 = Signal(signed(self.w), reset_less=True)
-        # reg_a2 = Signal(signed(self.w), reset_less=True)
-        # reg_b1 = Signal(signed(self.w), reset_less=True)
-        # reg_b2 = Signal(signed(self.w), reset_less=True)
-        # reg_m = Signal(signed(2 * self.w + 1), reset_less=True)
-        # reg_c = Signal(signed(self.real_width + self.real_shift),
-        #                reset_less=True)
-        # reg_p = Signal(signed(self.outw + self.truncate), reset_less=True)
-        # common_edge_q = Signal()
-        # common_edge_qq = Signal()
-        # out_prev = Signal(signed(self.outw), reset_less=True)
-        # is_greater_prev = Signal(reset_less=True)
+        m = Module()
+        reg_a1 = Signal(signed(self.w), reset_less=True)
+        reg_a2 = Signal(signed(self.w), reset_less=True)
+        reg_b1 = Signal(signed(self.w), reset_less=True)
+        reg_b2 = Signal(signed(self.w), reset_less=True)
+        reg_m = Signal(signed(2 * self.w + 1), reset_less=True)
+        reg_c = Signal(signed(self.real_width + self.real_shift),
+                       reset_less=True)
+        reg_p = Signal(signed(self.outw + self.truncate), reset_less=True)
+        common_edge_q = Signal()
+        common_edge_qq = Signal()
+        output_delay = [Signal(signed(self.outw), reset_less=True) for _ in range(self.delay -1)]
 
-        # with m.If(self.clken):
-        #     m.d[self._3x] += [
-        #         common_edge_q.eq(self.common_edge),
-        #         common_edge_qq.eq(common_edge_q),
-        #         reg_a1.eq(self.im_in),
-        #         reg_b1.eq(self.im_in),
-        #         reg_a2.eq(reg_a1),
-        #         reg_b2.eq(reg_b1),
-        #         reg_m.eq(reg_a2 * reg_b2),
-        #     ]
-        #     with m.If(self.common_edge):
-        #         m.d[self._3x] += [
-        #             reg_a1.eq(self.re_in),
-        #             reg_b1.eq(self.re_in),
-        #             reg_p.eq(Mux(self.peak_detect, reg_m, reg_m + reg_c)),
-        #             is_greater_prev.eq(reg_p[-1]),
-        #         ]
-        #     with m.If(common_edge_q):
-        #         m.d[self._3x] += [
-        #             reg_p.eq(reg_m + reg_p),
-        #         ]
-        #     with m.If(common_edge_qq):
-        #         m.d[self._3x] += [
-        #             reg_c.eq(self.real_in << self.real_shift),
-        #             reg_p.eq(reg_c - reg_p),
-        #         ]
-        #     m.d.sync += [
-        #         out_prev.eq(reg_p >> self.truncate),
-        #         self.out.eq(out_prev),
-        #         self.is_greater.eq(is_greater_prev),
-        #     ]
-        # return m
+        with m.If(self.clken):
+
+            m.d[self._3x] += [
+                common_edge_q.eq(self.common_edge),
+                common_edge_qq.eq(common_edge_q),
+                reg_a1.eq(self.im_in),
+                reg_b1.eq(self.im_in),
+                reg_a2.eq(reg_a1),
+                reg_b2.eq(reg_b1),
+                reg_m.eq(reg_a2 * reg_b2),
+            ]
+            with m.If(self.common_edge):
+                m.d[self._3x] += [
+                    reg_a1.eq(self.re_in),
+                    reg_b1.eq(self.re_in),
+                    reg_p.eq(reg_m + reg_c),
+                ]
+            with m.If(common_edge_q):
+                m.d[self._3x] += [
+                    reg_p.eq(reg_m + reg_p),
+                ]
+            with m.If(common_edge_qq):
+                m.d[self._3x] += [
+                    reg_c.eq(self.real_in << self.real_shift),
+                ]
+
+            m.d.sync += output_delay[0].eq(reg_p >> self.truncate)
+            for i in range(1,self.delay-1):
+                m.d.sync += output_delay[i].eq(output_delay[i-1])
+            m.d.comb += self.out.eq(output_delay[-1])
+
+        return m
 
     def elaborate_xilinx(self, platform):
         # Design with an instantiated DSP48E1
@@ -149,7 +148,7 @@ class CpwrTR(Elaboratable):
         port_b = Signal(signed(18), reset_less=True)
         port_c = Signal(48, reset_less=True)
         port_p = Signal(48, reset_less=True)
-        port_p_clken = Signal(reset_less=True)
+        #port_p_clken = Signal(reset_less=True)
         alumode = Signal(4, reset_less=True)
         opmode = Signal(7, reset_less=True)
         #cec = Signal(reset_less=True)
@@ -244,8 +243,6 @@ class CpwrTR(Elaboratable):
             m.d.sync += output_delay[0].eq(port_p >> self.truncate),
             for i in range(1,self.delay - 1):
                 m.d.sync += output_delay[i].eq(output_delay[i-1]),
-                #self.is_greater.eq(is_greater_prev),
-            m.d.sync += self.out.eq(output_delay[-1])
 
         m.d.comb += [
             port_a.eq(self.im_in),
@@ -253,7 +250,8 @@ class CpwrTR(Elaboratable):
             port_c.eq(self.real_in << self.real_shift),
             # Z + X + Y + CIN (used in most cases)
             alumode.eq(0b0000),
-            opmode.eq(0b010_01_01)  # P + M
+            opmode.eq(0b010_01_01),  # P + M
+            self.out.eq(output_delay[-1])
         ]
         with m.If(self.common_edge):
             m.d.comb += [
