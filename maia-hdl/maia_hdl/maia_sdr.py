@@ -525,7 +525,6 @@ class TRTSDR(Elaboratable):
             config.recorder_address_range[1],
             dma_name='m_axi_recorder', domain_in='sync',
             domain_dma='s_axi_lite')
-        self.ddc = DDC('clk3x')
         self.sdr_registers = Registers(
             'sdr', {
                 0b000: Register(
@@ -693,7 +692,6 @@ class TRTSDR(Elaboratable):
             sync_spectrometer_interrupt = PulseSynchronizer(
                 i_domain='sync', o_domain='s_axi_lite')
         m.submodules.recorder = self.recorder
-        m.submodules.ddc = self.ddc
         m.submodules.sdr_registers = self.sdr_registers
         m.submodules.sdr_registers_cdc = sdr_registers_cdc = RegisterCDC(
             's_axi_lite', 'sync', self.sdr_registers.aw)
@@ -714,24 +712,15 @@ class TRTSDR(Elaboratable):
             self.spectrometer.width_in, reset_less=True)
         spectrometer_im_in = Signal(
             self.spectrometer.width_in, reset_less=True)
-        assert len(spectrometer_re_in) == len(self.ddc.re_out)
-        assert len(spectrometer_im_in) == len(self.ddc.im_out)
         spectrometer_strobe_in = Signal()
-        with m.If(self.sdr_registers['spectrometer']['use_ddc_out']):
-            m.d.sync += [
-                spectrometer_re_in.eq(self.ddc.re_out),
-                spectrometer_im_in.eq(self.ddc.im_out),
-                spectrometer_strobe_in.eq(self.ddc.strobe_out),
-            ]
-        with m.Else():
-            shift = self.spectrometer.width_in - self.iq_in_width
-            m.d.sync += [
-                # The RX IQ samples have 12 bits, but the spectrometer input
-                # has 16 bits. Push the 12 bits to the MSBs.
-                spectrometer_re_in.eq(rxiq_cdc.re_out << shift),
-                spectrometer_im_in.eq(rxiq_cdc.im_out << shift),
-                spectrometer_strobe_in.eq(rxiq_cdc.strobe_out),
-            ]
+        shift = self.spectrometer.width_in - self.iq_in_width
+        m.d.sync += [
+            # The RX IQ samples have 12 bits, but the spectrometer input
+            # has 16 bits. Push the 12 bits to the MSBs.
+            spectrometer_re_in.eq(rxiq_cdc.re_out << shift),
+            spectrometer_im_in.eq(rxiq_cdc.im_out << shift),
+            spectrometer_strobe_in.eq(rxiq_cdc.strobe_out),
+        ]
         m.d.comb += [
             self.spectrometer.strobe_in.eq(spectrometer_strobe_in),
             self.spectrometer.common_edge_2x.eq(common_edge_2x.common_edge),
@@ -764,44 +753,6 @@ class TRTSDR(Elaboratable):
                 self.recorder.dropped_samples),
             (self.recorder_registers['recorder_next_address']
              ['next_address'].eq(self.recorder.next_address)),
-        ]
-
-        # DDC
-        m.d.comb += [
-            self.ddc.common_edge.eq(common_edge_3x.common_edge),
-            self.ddc.enable_input.eq(
-                self.sdr_registers['ddc_control']['enable_input']),
-            self.ddc.frequency.eq(
-                self.sdr_registers['ddc_frequency']['frequency']),
-            self.ddc.coeff_waddr.eq(
-                self.sdr_registers['ddc_coeff_addr']['coeff_waddr']),
-            self.ddc.coeff_wren.eq(
-                self.sdr_registers['ddc_coeff']['coeff_wren']),
-            self.ddc.coeff_wdata.eq(
-                self.sdr_registers['ddc_coeff']['coeff_wdata']),
-            self.ddc.decimation1.eq(
-                self.sdr_registers['ddc_decimation']['decimation1']),
-            self.ddc.decimation2.eq(
-                self.sdr_registers['ddc_decimation']['decimation2']),
-            self.ddc.decimation3.eq(
-                self.sdr_registers['ddc_decimation']['decimation3']),
-            self.ddc.bypass2.eq(
-                self.sdr_registers['ddc_control']['bypass2']),
-            self.ddc.bypass3.eq(
-                self.sdr_registers['ddc_control']['bypass3']),
-            self.ddc.operations_minus_one1.eq(
-                self.sdr_registers['ddc_control']['operations_minus_one1']),
-            self.ddc.operations_minus_one2.eq(
-                self.sdr_registers['ddc_control']['operations_minus_one2']),
-            self.ddc.operations_minus_one3.eq(
-                self.sdr_registers['ddc_control']['operations_minus_one3']),
-            self.ddc.odd_operations1.eq(
-                self.sdr_registers['ddc_control']['odd_operations1']),
-            self.ddc.odd_operations3.eq(
-                self.sdr_registers['ddc_control']['odd_operations3']),
-            self.ddc.strobe_in.eq(rxiq_cdc.strobe_out),
-            self.ddc.re_in.eq(rxiq_cdc.re_out),
-            self.ddc.im_in.eq(rxiq_cdc.im_out),
         ]
 
         # Registers s_axi_lite domain
