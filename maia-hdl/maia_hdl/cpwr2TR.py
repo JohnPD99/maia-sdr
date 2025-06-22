@@ -104,7 +104,16 @@ class Cpwr2TR(Elaboratable):
         p2reg_m = Signal(signed(2*self.w-1), reset_less=True)
         p2reg_p = Signal(signed(2*self.w-1), reset_less=True)
 
+        # fabric adder 1 (38s)
+        add1_res = Signal(signed(2*self.w + 2))
+        add1_a = Signal(signed(2*self.w + 1))
+        add1_b = Signal(signed(2*self.w + 1))
+        add1_a_q = Signal(signed(2*self.w + 1))
+        add1_b_q = Signal(signed(2*self.w + 1))
+
+
         # additional signal wires
+        real_delay = [Signal(signed(self.real_width), reset_less=True) for _ in range(self.delay -4)]
         pwr_x = Signal()
         pwr_l = Signal(signed(self.w))
         pwr_h = Signal(signed(self.w))
@@ -146,10 +155,13 @@ class Cpwr2TR(Elaboratable):
             m.d.sync += preg_out.eq(preg_p)
 
 
-            # assign pwr output signal to a lower and upper part
+            # cpwr2
             m.d.comb += [pwr_x.eq(preg_out[0]),
                          pwr_l.eq(Cat(preg_out[1:self.w], Const(0, 1))),
-                         pwr_h.eq(Cat(preg_out[self.w:2*self.w], Const(0,1)))
+                         pwr_h.eq(Cat(preg_out[self.w:2*self.w], Const(0,1))),
+                         add1_a.eq(pwr_h.as_unsigned() << 19),
+                         add1_b.eq(Cat(Const(1,1),pwr_l.as_unsigned() << 2)),
+                         add1_res.eq(add1_a_q + add1_b_q)
                          ]
             
             # standard connections
@@ -178,10 +190,24 @@ class Cpwr2TR(Elaboratable):
                 ]
 
             m.d.sync += [
+                real_delay[0].eq(self.real_in),
+                add_real.eq(real_delay[-1]),
                 add_hl.eq(p2reg_p.as_unsigned() << self.w + 2),
                 add_hh.eq(p2reg_hh_temp.as_unsigned() << 2*self.w + 2),
-                add_ll.eq(p2reg_ll_temp.as_unsigned() << 2)
+                add_ll.eq(p2reg_ll_temp.as_unsigned() << 2),
+                add1_a_q.eq(add1_a),
+                add1_b_q.eq(add1_b)
+
             ]
+
+            with m.If(pwr_x==1):
+                m.sync += add_h_l_x.eq(add1_res)
+            with m.Else:
+                m.sync += add_h_l_x.eq(0)
+
+
+            for i in range(1,self.delay-4):
+                m.d.sync += real_delay[i].eq(real_delay[i-1])
 
             
             
