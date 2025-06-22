@@ -107,6 +107,7 @@ class CpwrTR(Elaboratable):
         common_edge_q = Signal()
         common_edge_qq = Signal()
         output_delay = [Signal(signed(self.outw), reset_less=True) for _ in range(self.delay -1)]
+        out = Signal(signed(self.outw), reset_less=True)
 
         with m.If(self.clken):
 
@@ -137,7 +138,7 @@ class CpwrTR(Elaboratable):
             m.d.sync += output_delay[0].eq(reg_p >> self.truncate)
             for i in range(1,self.delay-1):
                 m.d.sync += output_delay[i].eq(output_delay[i-1])
-            m.d.comb += self.out.eq(output_delay[-1])
+            m.d.comb += out.eq(output_delay[-1])
 
         return m
 

@@ -93,17 +93,29 @@ class Cpwr2TR(Elaboratable):
         preg_a2 = Signal(signed(self.w), reset_less=True)
         preg_b1 = Signal(signed(self.w), reset_less=True)
         preg_b2 = Signal(signed(self.w), reset_less=True)
-        preg_m = Signal(signed(2 * self.w + 1), reset_less=True)
-        preg_p = Signal(signed(self.outw), reset_less=True)
+        preg_m = Signal(signed(2 * self.w), reset_less=True)
+        preg_p = Signal(signed(2 * self.w), reset_less=True)
+        preg_out = Signal(signed(2 * self.w), reset_less=True)
 
 
         # power^2 calculator
-        p2reg_a = Signal(signed(self.w+1))
-        p2reg_b = Signal(signed(self.w))
-        p2reg_c = Signal(signed(self.w))
-        p2reg_m = Signal(signed(2*self.w + 1))
-        p2reg_p = Signal(signed(2*self.w + 2))
+        p2reg_a = Signal(signed(self.w), reset_less=True)
+        p2reg_b = Signal(signed(self.w), reset_less=True)
+        p2reg_m = Signal(signed(2*self.w-1), reset_less=True)
+        p2reg_p = Signal(signed(2*self.w-1), reset_less=True)
 
+        # additional signal wires
+        pwr_x = Signal()
+        pwr_l = Signal(signed(self.w))
+        pwr_h = Signal(signed(self.w))
+        p2reg_hh_temp = Signal(signed(2*self.w - 1))
+        p2reg_ll_temp = Signal(signed(2*self.w - 1))
+        add_hh = Signal(signed(self.real_width))
+        add_ll = Signal(signed(self.real_width))
+        add_hl = Signal(signed(self.real_width))
+        add_real = Signal(signed(self.real_width))
+        add_h_l_x = Signal(signed(self.real_width))
+        
 
         
         common_edge_q = Signal()
@@ -131,9 +143,49 @@ class Cpwr2TR(Elaboratable):
                     preg_p.eq(preg_m + preg_p),
                 ]
 
-            m.d.sync += self.outpwr.eq(preg_p)
+            m.d.sync += preg_out.eq(preg_p)
 
-            # TODO implement power^2 accumulator
+
+            # assign pwr output signal to a lower and upper part
+            m.d.comb += [pwr_x.eq(preg_out[0]),
+                         pwr_l.eq(Cat(preg_out[1:self.w], Const(0, 1))),
+                         pwr_h.eq(Cat(preg_out[self.w:2*self.w], Const(0,1)))
+                         ]
+            
+            # standard connections
+            m.d[self._3x] += [
+                p2reg_a.eq(pwr_l),
+                p2reg_b.eq(pwr_h),
+                p2reg_m.eq(p2reg_a * p2reg_b),
+                p2reg_p.eq(p2reg_m),
+
+            ]
+
+
+            with m.If(self.common_edge):
+                m.d[self._3x] += [
+                    p2reg_a.eq(pwr_h),
+                    p2reg_b.eq(pwr_h),
+                    p2reg_hh_temp.eq(p2reg_p)
+                ]
+            
+            with m.If(common_edge_q):
+
+                m.d[self._3x] += [
+                    p2reg_a.eq(pwr_l),
+                    p2reg_b.eq(pwr_l),
+                    p2reg_ll_temp.eq(p2reg_p)
+                ]
+
+            m.d.sync += [
+                add_hl.eq(p2reg_p.as_unsigned() << self.w + 2),
+                add_hh.eq(p2reg_hh_temp.as_unsigned() << 2*self.w + 2),
+                add_ll.eq(p2reg_ll_temp.as_unsigned() << 2)
+            ]
+
+            
+            
+
 
 
         return m
