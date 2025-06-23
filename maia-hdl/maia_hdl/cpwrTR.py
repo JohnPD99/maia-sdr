@@ -81,7 +81,7 @@ class CpwrTR(Elaboratable):
     @property
     def delay(self):
         # We delay the output, since it has to align with cpwr_2, a new module that calculates the accumulation of the squared powers
-        return 8
+        return 7
 
     def model(self, re_in, im_in, real_in):
         pwr = re_in**2 + im_in**2
@@ -107,7 +107,6 @@ class CpwrTR(Elaboratable):
         common_edge_q = Signal()
         common_edge_qq = Signal()
         output_delay = [Signal(signed(self.outw), reset_less=True) for _ in range(self.delay -1)]
-        out = Signal(signed(self.outw), reset_less=True)
 
         with m.If(self.clken):
 
@@ -119,12 +118,13 @@ class CpwrTR(Elaboratable):
                 reg_a2.eq(reg_a1),
                 reg_b2.eq(reg_b1),
                 reg_m.eq(reg_a2 * reg_b2),
+                reg_p.eq(reg_m + reg_c),
+                
             ]
             with m.If(self.common_edge):
                 m.d[self._3x] += [
                     reg_a1.eq(self.re_in),
                     reg_b1.eq(self.re_in),
-                    reg_p.eq(reg_m + reg_c),
                 ]
             with m.If(common_edge_q):
                 m.d[self._3x] += [
@@ -138,7 +138,7 @@ class CpwrTR(Elaboratable):
             m.d.sync += output_delay[0].eq(reg_p >> self.truncate)
             for i in range(1,self.delay-1):
                 m.d.sync += output_delay[i].eq(output_delay[i-1])
-            m.d.comb += out.eq(output_delay[-1])
+            m.d.comb += self.out.eq(output_delay[-1])
 
         return m
 

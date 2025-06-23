@@ -52,10 +52,11 @@ class Cpwr2TR(Elaboratable):
         self.w = width
         self.outpwrw = 2 * width # max allowable width is 18 bits, leading to outpwrw of 36 bits, including sign bit
         
-        self.outw = (
-            2 * self.outpwrw - truncate # outwidth = multiplication of two 36 bit signed numbers, plus addition with real
-            if 2 * self.outpwrw >= real_width + real_shift
-            else real_width + real_shift + 1 - truncate) # outwidth = real_width plus addition of one number < real_width 
+        self.add_width = (
+            2 * self.outpwrw  # outwidth = multiplication of two 36 bit signed numbers, plus addition with real
+            if 2 * self.outpwrw - 1 >= real_width + real_shift
+            else real_width + real_shift + 1 ) # outwidth = real_width plus addition of one number < real_width 
+        self.outw = self.add_width - truncate
 
         self.real_width = real_width
         self.real_shift = real_shift
@@ -68,17 +69,19 @@ class Cpwr2TR(Elaboratable):
         self.real_in = Signal(signed(real_width))
         self.outpwr = Signal(signed(self.outpwrw))
         self.out = Signal(signed(self.outw), reset_less=True)
-         
+        #self.test = Signal(signed(self.add_width), reset_less=True)
+
     @property
     def delay(self):
-        return 8
+        return 7
 
     def model(self, re_in, im_in, real_in):
-        pwr = (re_in**2 + im_in**2) 
+        pwr = (re_in**2 + im_in**2)
         pwr2 = pwr**2
         real = real_in << self.real_shift
         out = (pwr2 + real) >> self.truncate
         return out
+
 
     def elaborate(self, platform):
         if isinstance(platform, XilinxPlatform):
@@ -104,6 +107,7 @@ class Cpwr2TR(Elaboratable):
         p2reg_m = Signal(signed(2*self.w-1), reset_less=True)
         p2reg_p = Signal(signed(2*self.w-1), reset_less=True)
         pwr_x = Signal()
+        pwr_x_q = Signal()
         pwr_l = Signal(signed(self.w))
         pwr_h = Signal(signed(self.w))
         p2reg_hh_temp = Signal(signed(2*self.w - 1))
@@ -118,24 +122,24 @@ class Cpwr2TR(Elaboratable):
         add1_b_q = Signal(signed(2*self.w + 1))
 
 
-        # additional signal wires
-        real_delay = [Signal(signed(self.real_width + self.real_shift), reset_less=True) for _ in range(self.delay -4)]
+       
 
         # fabric adder 2
-        add_hh = Signal(signed(self.outw))
-        add_ll = Signal(signed(self.outw))
-        add_hl = Signal(signed(self.outw))
-        add_real = Signal(signed(self.outw))
-        add_h_l_x = Signal(signed(self.outw))
-        add_hh_ll = Signal(signed(self.outw))
-        add_hl_real = Signal(signed(self.outw))
-        add_h_l_x_q = Signal(signed(self.outw))
-        add_c = Signal(signed(self.outw))
-        add_h_l_x_qq = Signal(signed(self.outw))
-        out = Signal(signed(self.outw))
+        add_hh = Signal(signed(4*self.w-1))
+        add_ll = Signal(signed(2*self.w + 1))
+        add_hl = Signal(signed(3*self.w + 1))
+        add_real = Signal(signed(self.add_width))
+        add_h_l_x = Signal(signed(2*self.w+1))
+        add_hh_ll = Signal(signed(4*self.w))
+        add_hl_real = Signal(signed(self.add_width))
+        add_h_l_x_q = Signal(signed(2*self.w+1))
+        add_c = Signal(signed(self.add_width))
+        add_h_l_x_qq = Signal(signed(2*self.w+1))
+        #out = Signal(signed(self.outw))
         
 
-        
+        # additional signal wires
+        real_delay = [Signal(signed(self.real_width + self.real_shift), reset_less=True) for _ in range(self.delay -4)]
         common_edge_q = Signal()
         common_edge_qq = Signal()
     
@@ -143,7 +147,6 @@ class Cpwr2TR(Elaboratable):
         with m.If(self.clken):
 
             # pwr
-
             m.d[self._3x] += [
                 common_edge_q.eq(self.common_edge),
                 common_edge_qq.eq(common_edge_q),
@@ -166,17 +169,18 @@ class Cpwr2TR(Elaboratable):
 
             m.d.sync += preg_out.eq(preg_p)
 
-
             # cpwr2
 
             m.d.comb += [pwr_x.eq(preg_out[0]),
                          pwr_l.eq(Cat(preg_out[1:self.w], Const(0, 1))),
-                         pwr_h.eq(Cat(preg_out[self.w:2*self.w], Const(0,1))),
-                         add1_a.eq(pwr_h.as_unsigned() << 19),
-                         add1_b.eq(Cat(Const(1,1),pwr_l.as_unsigned() << 2)),
-                         add1_res.eq(add1_a_q + add1_b_q)
+                         pwr_h.eq(Cat(preg_out[self.w:2*self.w-1], Const(0,1))),
+                         add1_a.eq(pwr_h.as_unsigned() << self.w+1),
+                         add1_b.eq((pwr_l.as_unsigned() << 2) | 1),
+                         add1_res.eq(add1_a_q + add1_b_q),
+                         #self.test.eq(add_real)
                          ]
-            
+
+
             m.d[self._3x] += [
                 p2reg_a.eq(pwr_l),
                 p2reg_b.eq(pwr_h),
@@ -201,25 +205,26 @@ class Cpwr2TR(Elaboratable):
                 ]
 
             m.d.sync += [
-                real_delay[0].eq(self.real_in),
-                add_real.eq(real_delay[-1].as_unsigned()),
+                real_delay[0].eq(self.real_in << self.real_shift),
+                add_real.eq(real_delay[-1]),
                 add_hl.eq(p2reg_p.as_unsigned() << self.w + 2),
-                add_hh.eq(p2reg_hh_temp.as_unsigned() << 2*self.w + 2),
+                add_hh.eq(p2reg_hh_temp.as_unsigned() << 2*self.w),
                 add_ll.eq(p2reg_ll_temp.as_unsigned() << 2),
                 add1_a_q.eq(add1_a),
                 add1_b_q.eq(add1_b),
                 add_hh_ll.eq(add_hh + add_ll),
                 add_hl_real.eq(add_hl + add_real),
-                add_h_l_x_q.eq(add_h_l_x_q),
+                add_h_l_x_q.eq(add_h_l_x),
                 add_h_l_x_qq.eq(add_h_l_x_q),
                 add_c.eq(add_hh_ll + add_hl_real),
-                out.eq(add_c + add_h_l_x_qq)
+                self.out.eq((add_c + add_h_l_x_qq)>>self.truncate),
+                pwr_x_q.eq(pwr_x)
             ]
 
-            with m.If(pwr_x==1):
-                m.sync += add_h_l_x.eq(add1_res)
-            with m.Else:
-                m.sync += add_h_l_x.eq(0)
+            with m.If(pwr_x_q):
+                m.d.sync += add_h_l_x.eq(add1_res)
+            with m.Else():
+                m.d.sync += add_h_l_x.eq(0)
 
 
             for i in range(1,self.delay-4):
@@ -317,7 +322,7 @@ class Cpwr2TR(Elaboratable):
 
         common_edge_q = Signal()
         common_edge_qq = Signal()
-        output_delay = [Signal(signed(self.outw), reset_less=True) for _ in range(self.delay -1)]
+        output_delay = [Signal(signed(self.add_width), reset_less=True) for _ in range(self.delay -1)]
     
         with m.If(self.clken):
             m.d[self._3x] += [
