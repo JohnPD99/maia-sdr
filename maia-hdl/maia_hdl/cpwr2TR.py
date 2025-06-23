@@ -50,12 +50,12 @@ class Cpwr2TR(Elaboratable):
         """
         self._3x = domain_3x
         self.w = width
-        self.outpwrw = 2 * width + 1 # max allowable width is 18 bits, leading to outpwrw of 37 bits.
+        self.outpwrw = 2 * width # max allowable width is 18 bits, leading to outpwrw of 36 bits, including sign bit
         
         self.outw = (
-            2 * self.outpwrw + 1 - truncate
+            2 * self.outpwrw - truncate # outwidth = multiplication of two 36 bit signed numbers, plus addition with real
             if 2 * self.outpwrw >= real_width + real_shift
-            else real_width + real_shift + 1 - truncate)
+            else real_width + real_shift + 1 - truncate) # outwidth = real_width plus addition of one number < real_width 
 
         self.real_width = real_width
         self.real_shift = real_shift
@@ -103,6 +103,12 @@ class Cpwr2TR(Elaboratable):
         p2reg_b = Signal(signed(self.w), reset_less=True)
         p2reg_m = Signal(signed(2*self.w-1), reset_less=True)
         p2reg_p = Signal(signed(2*self.w-1), reset_less=True)
+        pwr_x = Signal()
+        pwr_l = Signal(signed(self.w))
+        pwr_h = Signal(signed(self.w))
+        p2reg_hh_temp = Signal(signed(2*self.w - 1))
+        p2reg_ll_temp = Signal(signed(2*self.w - 1))
+
 
         # fabric adder 1 (38s)
         add1_res = Signal(signed(2*self.w + 2))
@@ -113,17 +119,20 @@ class Cpwr2TR(Elaboratable):
 
 
         # additional signal wires
-        real_delay = [Signal(signed(self.real_width), reset_less=True) for _ in range(self.delay -4)]
-        pwr_x = Signal()
-        pwr_l = Signal(signed(self.w))
-        pwr_h = Signal(signed(self.w))
-        p2reg_hh_temp = Signal(signed(2*self.w - 1))
-        p2reg_ll_temp = Signal(signed(2*self.w - 1))
-        add_hh = Signal(signed(self.real_width))
-        add_ll = Signal(signed(self.real_width))
-        add_hl = Signal(signed(self.real_width))
-        add_real = Signal(signed(self.real_width))
-        add_h_l_x = Signal(signed(self.real_width))
+        real_delay = [Signal(signed(self.real_width + self.real_shift), reset_less=True) for _ in range(self.delay -4)]
+
+        # fabric adder 2
+        add_hh = Signal(signed(self.outw))
+        add_ll = Signal(signed(self.outw))
+        add_hl = Signal(signed(self.outw))
+        add_real = Signal(signed(self.outw))
+        add_h_l_x = Signal(signed(self.outw))
+        add_hh_ll = Signal(signed(self.outw))
+        add_hl_real = Signal(signed(self.outw))
+        add_h_l_x_q = Signal(signed(self.outw))
+        add_c = Signal(signed(self.outw))
+        add_h_l_x_qq = Signal(signed(self.outw))
+        out = Signal(signed(self.outw))
         
 
         
@@ -133,6 +142,8 @@ class Cpwr2TR(Elaboratable):
 
         with m.If(self.clken):
 
+            # pwr
+
             m.d[self._3x] += [
                 common_edge_q.eq(self.common_edge),
                 common_edge_qq.eq(common_edge_q),
@@ -141,6 +152,7 @@ class Cpwr2TR(Elaboratable):
                 preg_a2.eq(preg_a1),
                 preg_b2.eq(preg_b1),
                 preg_m.eq(preg_a2 * preg_b2),
+                preg_p.eq(preg_m)
             ]
             with m.If(self.common_edge):
                 m.d[self._3x] += [
@@ -156,6 +168,7 @@ class Cpwr2TR(Elaboratable):
 
 
             # cpwr2
+
             m.d.comb += [pwr_x.eq(preg_out[0]),
                          pwr_l.eq(Cat(preg_out[1:self.w], Const(0, 1))),
                          pwr_h.eq(Cat(preg_out[self.w:2*self.w], Const(0,1))),
@@ -164,7 +177,6 @@ class Cpwr2TR(Elaboratable):
                          add1_res.eq(add1_a_q + add1_b_q)
                          ]
             
-            # standard connections
             m.d[self._3x] += [
                 p2reg_a.eq(pwr_l),
                 p2reg_b.eq(pwr_h),
@@ -172,7 +184,6 @@ class Cpwr2TR(Elaboratable):
                 p2reg_p.eq(p2reg_m),
 
             ]
-
 
             with m.If(self.common_edge):
                 m.d[self._3x] += [
@@ -191,13 +202,18 @@ class Cpwr2TR(Elaboratable):
 
             m.d.sync += [
                 real_delay[0].eq(self.real_in),
-                add_real.eq(real_delay[-1]),
+                add_real.eq(real_delay[-1].as_unsigned()),
                 add_hl.eq(p2reg_p.as_unsigned() << self.w + 2),
                 add_hh.eq(p2reg_hh_temp.as_unsigned() << 2*self.w + 2),
                 add_ll.eq(p2reg_ll_temp.as_unsigned() << 2),
                 add1_a_q.eq(add1_a),
-                add1_b_q.eq(add1_b)
-
+                add1_b_q.eq(add1_b),
+                add_hh_ll.eq(add_hh + add_ll),
+                add_hl_real.eq(add_hl + add_real),
+                add_h_l_x_q.eq(add_h_l_x_q),
+                add_h_l_x_qq.eq(add_h_l_x_q),
+                add_c.eq(add_hh_ll + add_hl_real),
+                out.eq(add_c + add_h_l_x_qq)
             ]
 
             with m.If(pwr_x==1):
@@ -208,11 +224,6 @@ class Cpwr2TR(Elaboratable):
 
             for i in range(1,self.delay-4):
                 m.d.sync += real_delay[i].eq(real_delay[i-1])
-
-            
-            
-
-
 
         return m
 
