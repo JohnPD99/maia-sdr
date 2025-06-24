@@ -5,6 +5,7 @@ import amaranth.cli
 import numpy as np
 
 from .cpwrTR import CpwrTR
+from .cpwr2TR import Cpwr2TR
 from .floating_point import IQToFloatingPoint, MakeCommonExponent
 from .pluto_platform import PlutoPlatform
 from .util import bit_invert
@@ -91,14 +92,23 @@ class S1_S2_module(Elaboratable):
         self.nw = nint_width
         # Here + 1 accounts for the addition of the real and imaginary parts.
         self.sumw = 2*self.fw + 1 + nint_width
+        self.sumw2 = 4*self.fw -1  + nint_width
+
         self.order_log2 = fft_order_log2
 
         self.to_fp = IQToFloatingPoint(self.w, self.fw)
         self.ew = len(self.to_fp.exponent_out)
+        
         self.common_exp = MakeCommonExponent(
             self.fw, self.sumw, self.ew, self.w - self.fw,
             a_complex=True, b_power=True, b_signed=False)
+        
+        self.common_exp2 = MakeCommonExponent(
+            self.fw, self.sumw2, self.ew, self.w - self.fw,
+            a_complex=True, b_power=False, b_power_2=True)
+
         self.cpwr = CpwrTR(domain_3x, self.fw, self.sumw)
+        self.cpwr2 = Cpwr2TR(domain_3x, self.fw, self.sumw2)
 
         self.nint = Signal(nint_width)
         self.abort = Signal()
@@ -146,23 +156,41 @@ class S1_S2_module(Elaboratable):
     def elaborate(self, platform):
         m = Module()
         m.submodules.to_fp = to_fp = self.to_fp
+        
         m.submodules.common_exp = common_exp = self.common_exp
+        m.submodules.common_exp2 = common_exp2 = self.common_exp2
+
         m.submodules.cpwr = cpwr = self.cpwr
+        m.submodules.cpwr2 = cpwr2 = self.cpwr2
 
         mems = [Memory(shape=self.sumw+self.ew, depth=2**self.order_log2,
                        init=[])
                 for _ in range(2)]
+        
+        mem_pwr_2 = Memory(shape=self.sumw2+self.ew, depth=2**self.order_log2,init=[])
+        
         m.submodules.mem0 = mems[0]
         m.submodules.mem1 = mems[1]
+        m.submodules.mem2 = mem_pwr_2
+
+
         rdports = [mem.read_port() for mem in mems]
+        rdport2 = mem_pwr_2.read_port()
         # BRAM output register
         rdports_reg = [Signal(self.sumw+self.ew, name=f'rdport{j}_reg',
                               reset_less=True)
                        for j in range(2)]
+        rdport_pwr2_reg = Signal(self.sumw2+self.ew, name=f'rdport2_reg', reset_less=True)
+        
         for j in range(2):
             with m.If(rdports[j].en):
                 m.d.sync += rdports_reg[j].eq(rdports[j].data)
+
+        with m.If(rdport2.en):
+            m.d.sync += rdport_pwr2_reg.eq(rdport2.data)
+
         wrports = [mem.write_port() for mem in mems]
+        wrport2 = mem_pwr_2.write_port()
 
         # We use the output register on the BRAM.
         mem_delay = 2
@@ -228,13 +256,22 @@ class S1_S2_module(Elaboratable):
 
         exp_delay = [Signal(self.ew, name=f'exp_q_{j}', reset_less=True)
                      for j in range(cpwr.delay)]
+        exp2_delay = [Signal(self.ew, name=f'exp2_q_{j}', reset_less=True)
+                     for j in range(cpwr.delay)]
+        
         with m.If(self.clken):
             m.d.sync += exp_delay[0].eq(common_exp.exponent_out)
+            m.d.sync += exp2_delay[0].eq(common_exp2.exponent_out)
             m.d.sync += [exp_delay[j].eq(exp_delay[j - 1])
                          for j in range(1, len(exp_delay))]
+            m.d.sync += [exp2_delay[j].eq(exp2_delay[j - 1])
+                         for j in range(1, len(exp2_delay))]
             
         read_data = Signal(self.sumw + self.ew)
+        read_data_2 = Signal(self.sumw2 + self.ew)
+
         rdata = Mux(pingpong, rdports_reg[0], rdports_reg[1])
+
         m.d.comb += [
             to_fp.clken.eq(self.clken),
             to_fp.re_in.eq(self.re_in),
@@ -244,19 +281,38 @@ class S1_S2_module(Elaboratable):
             common_exp.re_a_in.eq(to_fp.re_out),
             common_exp.im_a_in.eq(to_fp.im_out),
             common_exp.exponent_a_in.eq(to_fp.exponent_out),
+
+            common_exp2.clken.eq(self.clken),
+            common_exp2.re_a_in.eq(to_fp.re_out),
+            common_exp2.im_a_in.eq(to_fp.im_out),
+            common_exp2.exponent_a_in.eq(to_fp.exponent_out),
+
             read_data.eq(
                 Mux(not_first_sum_delay[-1],
                     Mux(pingpong_delay[mem_delay - 1],
                         rdports_reg[1], rdports_reg[0]),
                     0)),
+            
+            read_data_2.eq(Mux(not_first_sum_delay[-1],rdport_pwr2_reg,0)),
+
             common_exp.b_in.eq(read_data[:self.sumw]),
             common_exp.exponent_b_in.eq(read_data[-self.ew:]),
+
+            common_exp2.b_in.eq(read_data_2[:self.sumw2]),
+            common_exp2.exponent_b_in.eq(read_data_2[-self.ew:]),
 
             cpwr.clken.eq(self.clken),
             cpwr.common_edge.eq(self.common_edge),
             cpwr.re_in.eq(common_exp.re_a_out),
             cpwr.im_in.eq(common_exp.im_a_out),
             cpwr.real_in.eq(common_exp.b_out),
+
+            cpwr2.clken.eq(self.clken),
+            cpwr2.common_edge.eq(self.common_edge),
+            cpwr2.re_in.eq(common_exp2.re_a_out),
+            cpwr2.im_in.eq(common_exp2.im_a_out),
+            cpwr2.real_in.eq(common_exp2.b_out),
+
 
             self.done.eq(pingpong_delay[-1] ^ pingpong_q),
             # We need to include pingpong_delay[1] here because otherwise the
@@ -266,11 +322,14 @@ class S1_S2_module(Elaboratable):
                                  self.rden, self.clken)),
             rdports[1].en.eq(Mux(pingpong | pingpong_delay[mem_delay - 1],
                                  self.clken, self.rden)),
+            rdport2.en.eq(self.clken),
             rdports[0].addr.eq(Mux(pingpong, self.rdaddr, read_counter_shift)),
             rdports[1].addr.eq(Mux(pingpong, read_counter_shift, self.rdaddr)),
+            rdport2.addr.eq(read_counter_shift),
             # In average mode, always write back to the BRAM.
             wrports[0].en.eq((~pingpong_delay[-1]) & self.clken),
             wrports[1].en.eq(pingpong_delay[-1] & self.clken),
+            wrport2.en.eq(self.clken),
             self.rdata_value.eq(rdata[:self.sumw]),
             self.rdata_exponent.eq(rdata[-self.ew:]),
         ]
@@ -279,6 +338,10 @@ class S1_S2_module(Elaboratable):
                 wr.addr.eq(write_counter_shift),
                 wr.data.eq(Cat(cpwr.out[:self.sumw], exp_delay[-1])),
                 ]
+        m.d.comb += [
+            wrport2.addr.eq(write_counter_shift),
+            wrport2.data.eq(Cat(cpwr2.out[:self.sumw2], exp2_delay[-1]))
+        ]
         return m
 
 if __name__ == '__main__':

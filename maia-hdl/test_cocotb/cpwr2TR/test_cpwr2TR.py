@@ -33,7 +33,7 @@ async def run_test(dut):
     dut_delay = 8  # needs to be one more than the DUT delay @property
 
     re_in, im_in = (
-        [0 for _ in range(num_inputs)]
+        [random.randrange(-2**17, 2**17-1) for _ in range(num_inputs)]
         for _ in range(2))
     real_in = [random.randrange(-2**80, 2**80-1) for _ in range(num_inputs)]
 
@@ -48,9 +48,7 @@ async def run_test(dut):
             b = im_in[j - dut_delay]
             c = real_in[j - dut_delay]
             out = dut.out.value.signed_integer
-            result = ((a**2 + b**2)**2 + c<<1)>>1
-            print(result)
-            print(out)
+            result = ((a**2 + b**2)**2 + (c<<16))>>16
             assert out == result
 
 def min_signed_bitwidth(x: int) -> int:

@@ -18,8 +18,8 @@ from maia_hdl.pluto_platform import PlutoPlatform
 class Tb(Elaboratable):
     def __init__(self):
         self.clk3x = 'clk3x'
-        self.dut = Cpwr2TR(self.clk3x, width=18, real_width=81, real_shift=1,
-                            truncate=1)
+        self.dut = Cpwr2TR(self.clk3x, width=18, real_width=81, real_shift=16,
+                            truncate=16)
 
     def elaborate(self, platform):
         m = Module()

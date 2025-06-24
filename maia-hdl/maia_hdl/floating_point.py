@@ -57,14 +57,14 @@ class ShiftRight(Elaboratable):
         Output value (signed or unsigned depending on ``is_signed``).
     """
     def __init__(self, width, shift_width, max_shift, *, is_signed=True,
-                 is_power=False):
+                 is_power=False, is_power_2=False):
         self.w = width
         self.sw = shift_width
         self.max_shift = max_shift
         assert max_shift < 2**shift_width
         self.signed = signed if is_signed else unsigned
         self.is_power = is_power
-
+        self.is_power_2 = is_power_2
         self.in_data = Signal(self.signed(width))
         self.shift = Signal(shift_width)
         self.out_data = Signal(self.signed(width))
@@ -73,7 +73,12 @@ class ShiftRight(Elaboratable):
         m = Module()
         for j in range(self.max_shift + 1):
             with m.If(self.shift == j):
-                s = 2 * j if self.is_power else j
+                if self.is_power:
+                    s = 2*j
+                elif self.is_power_2:
+                    s = 4*j
+                else :
+                    s = j
                 m.d.comb += self.out_data.eq(self.in_data >> s)
         return m
 
@@ -203,7 +208,7 @@ class MakeCommonExponent(Elaboratable):
     a_width : int
         Width of the a input.
     b_width : int
-        Width of the a input.
+        Width of the b input.
     exponent_width : int
         Width of the exponent fields.
     max_exponent : int
@@ -276,8 +281,9 @@ class MakeCommonExponent(Elaboratable):
     """
     def __init__(self, a_width, b_width, exponent_width, max_exponent, *,
                  a_complex=False, b_complex=False,
-                 a_power=False, b_power=False,
+                 a_power=False, a_power_2=False, b_power=False, b_power_2 = False,
                  a_signed=True, b_signed=True):
+        
         self.aw = a_width
         self.bw = b_width
         self.ew = exponent_width
@@ -286,10 +292,13 @@ class MakeCommonExponent(Elaboratable):
         self.b_complex = b_complex
         self.a_power = a_power
         self.b_power = b_power
+        self.b_power_2 = b_power_2
+        self.a_power_2 = a_power_2
         self.a_signed = signed if a_signed else unsigned
         self.b_signed = signed if b_signed else unsigned
         self.is_a_signed = a_signed
         self.is_b_signed = b_signed
+
 
         self.clken = Signal()
         if a_complex:
@@ -309,6 +318,7 @@ class MakeCommonExponent(Elaboratable):
         else:
             self.b_in = Signal(self.b_signed(self.bw))
             self.b_out = Signal(self.b_signed(self.bw), reset_less=True)
+
         self.exponent_b_in = Signal(self.ew)
         self.exponent_out = Signal(self.ew, reset_less=True)
 
@@ -324,6 +334,10 @@ class MakeCommonExponent(Elaboratable):
             diff_a *= 2
         if self.b_power:
             diff_b *= 2
+        if self.b_power_2:
+            diff_b *= 4
+        if self.a_power_2:
+            diff_a *= 4
         return (re_a >> diff_a, im_a >> diff_a,
                 re_b >> diff_b, im_b >> diff_b,
                 max_exponent)
@@ -349,10 +363,10 @@ class MakeCommonExponent(Elaboratable):
             im_a_q = Signal(self.a_signed(self.aw), reset_less=True)
             m.submodules.shift_re_a = ShiftRight(
                 self.aw, self.ew, self.max_exp,
-                is_signed=self.is_a_signed, is_power=self.a_power)
+                is_signed=self.is_a_signed, is_power=self.a_power, is_power_2=self.a_power_2)
             m.submodules.shift_im_a = ShiftRight(
                 self.aw, self.ew, self.max_exp,
-                is_signed=self.is_a_signed, is_power=self.a_power)
+                is_signed=self.is_a_signed, is_power=self.a_power, is_power_2=self.a_power_2)
             m.d.comb += [
                 m.submodules.shift_re_a.in_data.eq(re_a_q),
                 m.submodules.shift_re_a.shift.eq(diff_a),
@@ -372,7 +386,7 @@ class MakeCommonExponent(Elaboratable):
             a_q = Signal(self.a_signed(self.aw), reset_less=True)
             m.submodules.shift_a = ShiftRight(
                 self.aw, self.ew, self.max_exp,
-                is_signed=self.is_a_signed, is_power=self.a_power)
+                is_signed=self.is_a_signed, is_power=self.a_power, is_power_2=self.a_power_2)
             m.d.comb += [
                 m.submodules.shift_a.in_data.eq(re_a_q),
                 m.submodules.shift_a.shift.eq(diff_a),
@@ -388,10 +402,10 @@ class MakeCommonExponent(Elaboratable):
             im_b_q = Signal(self.b_signed(self.bw), reset_less=True)
             m.submodules.shift_re_b = ShiftRight(
                 self.bw, self.ew, self.max_exp,
-                is_signed=self.is_b_signed, is_power=self.b_power)
+                is_signed=self.is_b_signed, is_power=self.b_power, is_power_2=self.b_power_2)
             m.submodules.shift_im_b = ShiftRight(
                 self.bw, self.ew, self.max_exp,
-                is_signed=self.is_b_signed, is_power=self.b_power)
+                is_signed=self.is_b_signed, is_power=self.b_power, is_power_2=self.b_power_2)
             m.d.comb += [
                 m.submodules.shift_re_b.in_data.eq(re_b_q),
                 m.submodules.shift_re_b.shift.eq(diff_b),
@@ -411,7 +425,7 @@ class MakeCommonExponent(Elaboratable):
             b_q = Signal(self.b_signed(self.bw), reset_less=True)
             m.submodules.shift_b = ShiftRight(
                 self.bw, self.ew, self.max_exp,
-                is_signed=self.is_b_signed, is_power=self.b_power)
+                is_signed=self.is_b_signed, is_power=self.b_power, is_power_2=self.b_power_2)
             m.d.comb += [
                 m.submodules.shift_b.in_data.eq(b_q),
                 m.submodules.shift_b.shift.eq(diff_b),

@@ -8,6 +8,7 @@
 
 from amaranth import *
 import numpy as np
+import random
 
 import unittest
 
@@ -56,19 +57,21 @@ class TestIQToFloatingPoint(AmaranthSim):
 class TestMakeCommonExponent(AmaranthSim):
     def test_random_inputs(self):
         a_width = 22
-        b_width = 47
-        exponent_width = 3
-        max_exponent = 4
+        b_width = 81
+        exponent_width = 6
+        max_exponent = 8
         assert max_exponent < 2**exponent_width
         self.dut = MakeCommonExponent(
             a_width, b_width, exponent_width, max_exponent,
-            a_complex=True, b_signed=False, b_power=True)
+            a_complex=True, b_signed=False, b_power=False, b_power_2=True)
 
         num_inputs = 2048
         re_a, im_a = (np.random.randint(-2**(a_width-1), 2**(a_width-1),
                                         size=num_inputs)
                       for _ in range(2))
-        b = np.random.randint(0, 2**b_width, size=num_inputs)
+        b = np.array([random.randrange(0, 2**(b_width))
+            for _ in range(num_inputs)
+        ], dtype=object)
         exp_a, exp_b = (np.random.randint(0, max_exponent + 1,
                                           size=num_inputs)
                         for _ in range(2))
