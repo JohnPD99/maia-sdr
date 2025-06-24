@@ -67,7 +67,6 @@ class Cpwr2TR(Elaboratable):
         self.re_in = Signal(signed(self.w))
         self.im_in = Signal(signed(self.w))
         self.real_in = Signal(signed(real_width))
-        self.outpwr = Signal(signed(self.outpwrw))
         self.out = Signal(signed(self.outw), reset_less=True)
         #self.test = Signal(signed(self.add_width), reset_less=True)
 
@@ -139,7 +138,7 @@ class Cpwr2TR(Elaboratable):
         
 
         # additional signal wires
-        real_delay = [Signal(signed(self.real_width + self.real_shift), reset_less=True) for _ in range(self.delay -4)]
+        real_delay = [Signal(signed(self.add_width), reset_less=True) for _ in range(self.delay -4)]
         common_edge_q = Signal()
         common_edge_qq = Signal()
     
@@ -233,17 +232,18 @@ class Cpwr2TR(Elaboratable):
         return m
 
     def elaborate_xilinx(self, platform):
-        # Design with an instantiated DSP48E1
+        # Design with two instantiated DSP48E1
+
+      
         m = Module()
-        port_a = Signal(signed(30), reset_less=True)
-        port_b = Signal(signed(18), reset_less=True)
-        port_c = Signal(48, reset_less=True)
-        port_p = Signal(48, reset_less=True)
-        #port_p_clken = Signal(reset_less=True)
-        alumode = Signal(4, reset_less=True)
-        opmode = Signal(7, reset_less=True)
-        #cec = Signal(reset_less=True)
-        m.submodules.dsp = dsp = Instance(
+
+        #DSP1
+        dsp1_a1 = Signal(signed(30), reset_less=True)
+        dsp1_b1 = Signal(signed(18), reset_less=True)
+        dsp1_p = Signal(48, reset_less=True)
+        dsp1_opmode = Signal(7, reset_less=True)
+
+        m.submodules.dsp = dsp1 = Instance(
             'DSP48E1',
             p_A_INPUT='DIRECT',  # A port rather than ACIN
             p_B_INPUT='DIRECT',  # B port rather than BCIN
@@ -276,7 +276,7 @@ class Cpwr2TR(Elaboratable):
             o_CARRYOUT=Signal(4),
             o_MULTSIGNOUT=Signal(),
             o_OVERFLOW=Signal(),
-            o_P=port_p,
+            o_P=dsp1_p,
             o_PATTERNBDETECT=Signal(),
             o_PATTERNDETECT=Signal(),
             o_PCOUT=Signal(48),
@@ -286,14 +286,14 @@ class Cpwr2TR(Elaboratable):
             i_CARRYCASCIN=0,
             i_MULTSIGNIN=0,
             i_PCIN=Const(0, unsigned(48)),
-            i_ALUMODE=alumode,
+            i_ALUMODE=Const(0, unsigned(4)),
             i_CARRYINSEL=Const(0, unsigned(3)),
             i_CLK=ClockSignal(self._3x),
             i_INMODE=Const(0, unsigned(5)),  # A2, B2
-            i_OPMODE=opmode,
-            i_A=port_a,
-            i_B=port_b,
-            i_C=port_c,
+            i_OPMODE=dsp1_opmode,
+            i_A=dsp1_a1,
+            i_B=dsp1_b1,
+            i_C=Const(0, unsigned(48)),
             i_CARRYIN=0,
             i_D=Const(0, unsigned(25)),
             i_CEA1=self.clken,
@@ -302,7 +302,7 @@ class Cpwr2TR(Elaboratable):
             i_CEALUMODE=self.clken,
             i_CEB1=self.clken,
             i_CEB2=self.clken,
-            i_CEC=self.clken,
+            i_CEC=0,
             i_CECARRYIN=0,
             i_CECTRL=self.clken,
             i_CED=0,
@@ -320,40 +320,212 @@ class Cpwr2TR(Elaboratable):
             i_RSTM=0,
             i_RSTP=0)
 
+        
+        preg_out = Signal(signed(2 * self.w), reset_less=True)
+    
+        #DSP2
+        dsp2_a1 = Signal(signed(30), reset_less=True)
+        dsp2_b1 = Signal(signed(18), reset_less=True)
+        dsp2_p = Signal(48, reset_less=True)
+
+        m.submodules.dsp2 = dsp2 = Instance(
+            'DSP48E1',
+            p_A_INPUT='DIRECT',  # A port rather than ACIN
+            p_B_INPUT='DIRECT',  # B port rather than BCIN
+            p_USE_DPORT='FALSE',
+            p_USE_MULT='MULTIPLY',
+            p_USE_SIMD='ONE48',
+            p_AUTORESET_PATDET='NO_RESET',
+            p_MASK=2**48-1,  # ignore all bits
+            p_PATTERN=0,
+            p_SEL_MASK='MASK',
+            p_SEL_PATTERN='PATTERN',
+            p_USE_PATTERN_DETECT='NO_PATDET',
+            p_ACASCREG=1,  # number of A register stages
+            p_ADREG=1,
+            p_ALUMODEREG=1,
+            p_AREG=1,
+            p_BCASCREG=1,
+            p_BREG=1,
+            p_CARRYINREG=1,
+            p_CARRYINSELREG=1,
+            p_CREG=1,
+            p_DREG=1,
+            p_INMODEREG=1,
+            p_MREG=1,
+            p_OPMODEREG=1,
+            p_PREG=1,
+            o_ACOUT=Signal(30),
+            o_BCOUT=Signal(18),
+            o_CARRYCASCOUT=Signal(),
+            o_CARRYOUT=Signal(4),
+            o_MULTSIGNOUT=Signal(),
+            o_OVERFLOW=Signal(),
+            o_P=dsp2_p,
+            o_PATTERNBDETECT=Signal(),
+            o_PATTERNDETECT=Signal(),
+            o_PCOUT=Signal(48),
+            o_UNDERFLOW=Signal(),
+            i_ACIN=Const(0, unsigned(30)),
+            i_BCIN=Const(0, unsigned(18)),
+            i_CARRYCASCIN=0,
+            i_MULTSIGNIN=0,
+            i_PCIN=Const(0, unsigned(48)),
+            i_ALUMODE=Const(0, unsigned(4)),
+            i_CARRYINSEL=Const(0, unsigned(3)),
+            i_CLK=ClockSignal(self._3x),
+            i_INMODE=Const(0, unsigned(5)),  # A2, B2
+            i_OPMODE=Const(0b000_01_01, unsigned(7)),
+            i_A=dsp2_a1,
+            i_B=dsp2_b1,
+            i_C=Const(0, unsigned(48)),
+            i_CARRYIN=0,
+            i_D=Const(0, unsigned(25)),
+            i_CEA1=0,
+            i_CEA2=self.clken,
+            i_CEAD=self.clken,
+            i_CEALUMODE=self.clken,
+            i_CEB1=0,
+            i_CEB2=self.clken,
+            i_CEC=0,
+            i_CECARRYIN=0,
+            i_CECTRL=self.clken,
+            i_CED=0,
+            i_CEINMODE=self.clken,
+            i_CEM=self.clken,
+            i_CEP=self.clken,
+            i_RSTA=0,
+            i_RSTALLCARRYIN=0,
+            i_RSTALUMODE=0,
+            i_RSTB=0,
+            i_RSTC=0,
+            i_RSTCTRL=0,
+            i_RSTD=0,
+            i_RSTINMODE=0,
+            i_RSTM=0,
+            i_RSTP=0)
+
+        
+        pwr_x = Signal()
+        pwr_x_q = Signal()
+        pwr_l = Signal(signed(self.w))
+        pwr_h = Signal(signed(self.w))
+        p2reg_hh_temp = Signal(signed(2*self.w - 1))
+        p2reg_ll_temp = Signal(signed(2*self.w - 1))
+
+        # fabric adder 1 (38s)
+        add1_res = Signal(signed(2*self.w + 2))
+        add1_a = Signal(signed(2*self.w + 1))
+        add1_b = Signal(signed(2*self.w + 1))
+        add1_a_q = Signal(signed(2*self.w + 1))
+        add1_b_q = Signal(signed(2*self.w + 1))
+
+
+        # fabric adder 2
+        add_hh = Signal(signed(4*self.w-1))
+        add_ll = Signal(signed(2*self.w + 1))
+        add_hl = Signal(signed(3*self.w + 1))
+        add_real = Signal(signed(self.add_width))
+        add_h_l_x = Signal(signed(2*self.w+1))
+        add_hh_ll = Signal(signed(4*self.w))
+        add_hl_real = Signal(signed(self.add_width))
+        add_h_l_x_q = Signal(signed(2*self.w+1))
+        add_c = Signal(signed(self.add_width))
+        add_h_l_x_qq = Signal(signed(2*self.w+1))
+
+        real_delay = [Signal(signed(self.real_width + self.real_shift), reset_less=True) for _ in range(self.delay -4)]
         common_edge_q = Signal()
         common_edge_qq = Signal()
-        output_delay = [Signal(signed(self.add_width), reset_less=True) for _ in range(self.delay -1)]
-    
+
+
         with m.If(self.clken):
+
+            # Power calculation
+
             m.d[self._3x] += [
                 common_edge_q.eq(self.common_edge),
                 common_edge_qq.eq(common_edge_q),
             ]
-            # with m.If(self.common_edge):
-            #     m.d[self._3x] += is_greater_prev.eq(port_p[47])
-            m.d.sync += output_delay[0].eq(port_p >> self.truncate),
-            for i in range(1,self.delay - 1):
-                m.d.sync += output_delay[i].eq(output_delay[i-1]),
+           
+            m.d.sync += preg_out.eq(dsp1_p),
 
-        m.d.comb += [
-            port_a.eq(self.im_in),
-            port_b.eq(self.im_in),
-            port_c.eq(self.real_in << self.real_shift),
-            # Z + X + Y + CIN (used in most cases)
-            alumode.eq(0b0000),
-            opmode.eq(0b010_01_01),  # P + M
-            self.out.eq(output_delay[-1])
-        ]
-        with m.If(self.common_edge):
             m.d.comb += [
-                port_a.eq(self.re_in),
-                port_b.eq(self.re_in),
+                dsp1_a1.eq(self.im_in),
+                dsp1_b1.eq(self.im_in),
+                # M
+                dsp1_opmode.eq(0b000_01_01),  
             ]
-        with m.If(common_edge_qq):
+            with m.If(self.common_edge):
+                m.d.comb += [
+                    dsp1_a1.eq(self.re_in),
+                    dsp1_b1.eq(self.re_in),
+                     # M + P
+                    dsp1_opmode.eq(0b010_01_01),
+                ]
+
+            # Squaring power and adding it to real_in
+
             m.d.comb += [
-                # M (peak) or C + M (avg)
-                opmode.eq(0b011_01_01),
+                # spliting up pwr into 3 parts
+                pwr_x.eq(preg_out[0]),
+                pwr_l.eq(Cat(preg_out[1:self.w], Const(0, 1))),
+                pwr_h.eq(Cat(preg_out[self.w:2*self.w-1], Const(0,1))),
+                # small fabric adder
+                add1_a.eq(pwr_h.as_unsigned() << self.w+1),
+                add1_b.eq((pwr_l.as_unsigned() << 2) | 1),
+                add1_res.eq(add1_a_q + add1_b_q),
+                dsp2_a1.eq(pwr_l),
+                dsp2_b1.eq(pwr_h)
             ]
+
+            with m.If(self.common_edge):
+                m.d[self._3x] += [
+                    p2reg_hh_temp.eq(dsp2_p)
+                ]
+                m.d.comb += [
+                    dsp2_a1.eq(pwr_h),
+                    dsp2_b1.eq(pwr_h),
+                ]
+            
+            with m.If(common_edge_q):
+
+                m.d[self._3x] += [
+                    p2reg_ll_temp.eq(dsp2_p)
+                ]
+                m.d.comb += [
+                    dsp2_a1.eq(pwr_l),
+                    dsp2_b1.eq(pwr_l),
+                ]
+
+            m.d.sync += [
+                real_delay[0].eq(self.real_in << self.real_shift),
+                add_real.eq(real_delay[-1]),
+                add_hl.eq(dsp2_p.as_unsigned() << self.w + 2),
+                add_hh.eq(p2reg_hh_temp.as_unsigned() << 2*self.w),
+                add_ll.eq(p2reg_ll_temp.as_unsigned() << 2),
+                add1_a_q.eq(add1_a),
+                add1_b_q.eq(add1_b),
+                add_hh_ll.eq(add_hh + add_ll),
+                add_hl_real.eq(add_hl + add_real),
+                add_h_l_x_q.eq(add_h_l_x),
+                add_h_l_x_qq.eq(add_h_l_x_q),
+                add_c.eq(add_hh_ll + add_hl_real),
+                self.out.eq((add_c + add_h_l_x_qq)>>self.truncate),
+                pwr_x_q.eq(pwr_x)
+            ]
+
+            with m.If(pwr_x_q):
+                m.d.sync += add_h_l_x.eq(add1_res)
+            with m.Else():
+                m.d.sync += add_h_l_x.eq(0)
+
+
+            for i in range(1,self.delay-4):
+                m.d.sync += real_delay[i].eq(real_delay[i-1])
+
+
+
+
         return m
 
 
