@@ -728,8 +728,7 @@ class TRTSDR(Elaboratable):
             self.spectrometer.re_in.eq(spectrometer_re_in),
             self.spectrometer.im_in.eq(spectrometer_im_in),
             sync_spectrometer_interrupt.i.eq(self.spectrometer.interrupt_out),
-            self.spectrometer.number_integrations.eq(
-                self.sdr_registers['spectrometer']['num_integrations']),
+            self.spectrometer.log2_number_integrations.eq(6),
             self.spectrometer.abort.eq(
                 self.sdr_registers['spectrometer']['abort']),
             self.sdr_registers['spectrometer']['last_buffer'].eq(

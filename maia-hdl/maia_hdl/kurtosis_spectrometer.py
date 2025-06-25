@@ -51,7 +51,7 @@ class Kurthosis_Spectrometer(Elaboratable):
         Input samples real part.
     im_in : Signal(signed(16)), in
         Input samples imaginary part.
-    number_integrations : Signal(10), in
+    log2_number_integrations : Signal(10), in
         Sets the number of integrations to use in the integrator.
     abort : Signal(), in
         Abort signal for the integrator. Used to finish the current
@@ -68,7 +68,7 @@ class Kurthosis_Spectrometer(Elaboratable):
         self.fft_order_log2 = 12
         self.width_in = 16
 
-        self.nint_width = 10
+        self.nint_width = 5
 
         self.dma = DmaBRAMWrite(
             dma_base_address, dma_buffers_log2,
@@ -80,7 +80,7 @@ class Kurthosis_Spectrometer(Elaboratable):
         self.re_in = Signal(signed(self.width_in))
         self.im_in = Signal(signed(self.width_in))
 
-        self.number_integrations = Signal(self.nint_width)
+        self.log2_number_integrations = Signal(self.nint_width)
         self.abort = Signal()
         self.last_buffer = Signal(dma_buffers_log2)
 
@@ -92,7 +92,7 @@ class Kurthosis_Spectrometer(Elaboratable):
             self.common_edge,
             self.re_in,
             self.im_in,
-            self.number_integrations,
+            self.log2_number_integrations,
             self.abort,
             self.last_buffer,
             self.interrupt_out,
@@ -138,7 +138,7 @@ class Kurthosis_Spectrometer(Elaboratable):
             fft.re_in.eq(self.re_in),
             fft.im_in.eq(self.im_in),
 
-            integrator.nint.eq(self.number_integrations),
+            integrator.log2_nint.eq(self.log2_number_integrations),
             integrator.abort.eq(self.abort),
             integrator.clken.eq(self.strobe_in),
             integrator.common_edge.eq(self.common_edge_3x),

@@ -9,6 +9,7 @@ from .cpwr2TR import Cpwr2TR
 from .floating_point import IQToFloatingPoint, MakeCommonExponent
 from .pluto_platform import PlutoPlatform
 from .util import bit_invert
+from .kurtosis_thresholder import Kurtosis_Tresholder
 
 
 
@@ -46,7 +47,7 @@ class S1_S2_module(Elaboratable):
 
     Attributes
     ----------
-    nint : Signal(nint_width), in
+    log2_nint : Signal(nint_width), in
         Number of integrations to perform. This signal is only latched
         after the current integration has finished.
     abort : Signal(), in
@@ -90,9 +91,10 @@ class S1_S2_module(Elaboratable):
         self.w = input_width
         self.fw = input_fp_width
         self.nw = nint_width
+        self.nint_width_no_log = 10
         # Here + 1 accounts for the addition of the real and imaginary parts.
-        self.sumw = 2*self.fw + 1 + nint_width
-        self.sumw2 = 4*self.fw -1  + nint_width
+        self.sumw = 2*self.fw + 1 + self.nint_width_no_log
+        self.sumw2 = 4*self.fw -1  + self.nint_width_no_log
 
         self.order_log2 = fft_order_log2
 
@@ -106,11 +108,13 @@ class S1_S2_module(Elaboratable):
         self.common_exp2 = MakeCommonExponent(
             self.fw, self.sumw2, self.ew, self.w - self.fw,
             a_complex=True, b_power=False, b_power_2=True)
+        
+        #self.kurtosis_module = Kurtosis_Tresholder(self.sumw, self.sumw2)
 
         self.cpwr = CpwrTR(domain_3x, self.fw, self.sumw)
         self.cpwr2 = Cpwr2TR(domain_3x, self.fw, self.sumw2)
 
-        self.nint = Signal(nint_width)
+        self.log2_nint = Signal(nint_width)
         self.abort = Signal()
         #self.peak_detect = Signal()
         self.clken = Signal()
@@ -125,17 +129,17 @@ class S1_S2_module(Elaboratable):
         self.rden = Signal()
 
     @property
-    def model_vlen(self, nint):
-        return 2**self.order_log2 * nint
+    def model_vlen(self, log2_nint):
+        return 2**self.order_log2 * (2**log2_nint)
 
-    def model(self, nint, re_in, im_in):
+    def model(self, log2_nint, re_in, im_in):
         re_in, im_in = (
-            np.array(x, 'int').reshape(-1, nint, 2**self.order_log2)
+            np.array(x, 'int').reshape(-1, 2**log2_nint, 2**self.order_log2)
             for x in [re_in, im_in])
         re_in, im_in, exp_in = self.to_fp.model(re_in, im_in)
         acc, acc_exp = (np.zeros((re_in.shape[0], 2**self.order_log2), 'int')
                         for _ in range(2))
-        for j in range(nint):
+        for j in range(2**log2_nint):
             re_in_c, im_in_c, acc_c, _, exp_c = self.common_exp.model(
                 re_in[:, j], im_in[:, j], exp_in[:, j],
                 acc, np.zeros_like(acc), acc_exp)
@@ -162,6 +166,8 @@ class S1_S2_module(Elaboratable):
 
         m.submodules.cpwr = cpwr = self.cpwr
         m.submodules.cpwr2 = cpwr2 = self.cpwr2
+
+        #m.submodules.kurt_thresh = kurtosis_module = self.kurtosis_module
 
         mems = [Memory(shape=self.sumw+self.ew, depth=2**self.order_log2,
                        init=[])
@@ -205,7 +211,7 @@ class S1_S2_module(Elaboratable):
         write_counter_rst = (
             (read_counter_rst - processing_delay) % 2**self.order_log2)
         write_counter = Signal(self.order_log2, init=write_counter_rst)
-        sum_counter = Signal(self.nw)
+        sum_counter = Signal(self.nint_width_no_log)
         not_first_sum = Signal()
         not_first_sum_delay = Signal(mem_delay)
         pingpong = Signal()
@@ -233,7 +239,7 @@ class S1_S2_module(Elaboratable):
                 with m.If((sum_counter == 1) | (sum_counter == 0) | do_abort):
                     # A new sum starts
                     m.d.sync += [
-                        sum_counter.eq(self.nint),
+                        sum_counter.eq(1<<self.log2_nint),
                         not_first_sum.eq(0),
                         pingpong.eq(~pingpong),
                         do_abort.eq(0),
@@ -269,7 +275,6 @@ class S1_S2_module(Elaboratable):
             
         read_data = Signal(self.sumw + self.ew)
         read_data_2 = Signal(self.sumw2 + self.ew)
-
         rdata = Mux(pingpong, rdports_reg[0], rdports_reg[1])
 
         m.d.comb += [
@@ -286,6 +291,7 @@ class S1_S2_module(Elaboratable):
             common_exp2.re_a_in.eq(to_fp.re_out),
             common_exp2.im_a_in.eq(to_fp.im_out),
             common_exp2.exponent_a_in.eq(to_fp.exponent_out),
+            
 
             read_data.eq(
                 Mux(not_first_sum_delay[-1],
@@ -348,7 +354,7 @@ if __name__ == '__main__':
     integrator = S1_S2_module('clk_3x', 22, 18, 10, 12)
     amaranth.cli.main(
         integrator, ports=[
-            integrator.clken, integrator.nint,
+            integrator.clken, integrator.log2_nint,
             integrator.common_edge,
             integrator.input_last, integrator.re_in, integrator.im_in,
             integrator.done, integrator.rdaddr, integrator.rdata_value,

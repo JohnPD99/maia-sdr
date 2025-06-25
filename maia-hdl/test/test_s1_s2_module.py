@@ -20,18 +20,18 @@ class TestSpectrumIntegrator(AmaranthSim):
     def setUp(self):
         self.width = 22
         self.fp_width = 18
-        self.nint_width = 10
+        self.nint_width = 5
         self.read_delay = 2  # we are using a BRAM output register
         self.domain_3x = 'clk3x'
 
     def test_model(self):
         self.fft_order_log2 = 8
         self.nfft = 2**self.fft_order_log2
-        for integrations in [5, 2]:
-            with self.subTest(integrations=integrations):
-                self.common_model(integrations)
+        for log2_integrations in [5, 2]:
+            with self.subTest(log2_integrations=log2_integrations):
+                self.common_model(log2_integrations)
 
-    def common_model(self, integrations):
+    def common_model(self, log2_integrations):
         self.dut0 = S1_S2_module(
             self.domain_3x, self.width, self.fp_width, self.nint_width,
             self.fft_order_log2)
@@ -40,11 +40,11 @@ class TestSpectrumIntegrator(AmaranthSim):
 
         re_in, im_in = (
             np.random.randint(-2**(self.width-1), 2**(self.width-1),
-                              size=(3*integrations + 1)*self.nfft)
+                              size=(3*(2**log2_integrations) + 1)*self.nfft)
             for _ in range(2))
 
         async def set_inputs(ctx):
-            ctx.set(self.dut0.nint, integrations)
+            ctx.set(self.dut0.log2_nint, log2_integrations)
             for j, x in enumerate(zip(re_in, im_in)):
                 await ctx.tick()
                 re = x[0]
@@ -89,10 +89,10 @@ class TestSpectrumIntegrator(AmaranthSim):
             for n in range(2):
                 await wait_ready()
                 sel = slice(
-                    (n * integrations + 1) * self.nfft,
-                    ((n + 1) * integrations + 1) * self.nfft)
+                    (n * (2**log2_integrations) + 1) * self.nfft,
+                    ((n + 1) * (2**log2_integrations) + 1) * self.nfft)
                 expected = self.dut0.model(
-                    integrations, re_in[sel], im_in[sel])
+                    log2_integrations, re_in[sel], im_in[sel])
                 await check_ram(*expected)
 
         self.simulate([set_inputs, check_ram_contents],
@@ -111,12 +111,12 @@ class TestSpectrumIntegrator(AmaranthSim):
             self.fft_order_log2)
         self.dut = CommonEdgeTb(
             self.dut0, [(self.domain_3x, 3, 'common_edge')])
-        integrations = 5
+        log2_integrations = 5
 
         async def set_inputs(ctx):
-            ctx.set(self.dut0.nint, integrations)
-            for n in range(10 * integrations):
-                integration_num = (n - 1) // integrations
+            ctx.set(self.dut0.log2_nint, log2_integrations)
+            for n in range(10 * (2**log2_integrations)):
+                integration_num = (n - 1) // (2**log2_integrations)
                 amplitude = 2**(integration_num % 2)
                 for j in range(self.nfft):
                     await ctx.tick()
@@ -137,7 +137,7 @@ class TestSpectrumIntegrator(AmaranthSim):
 
             async def check(num_check):
                 amplitude = 4**(num_check % 2)
-                expected_out = integrations * amplitude
+                expected_out = (2**log2_integrations) * amplitude
                 for j in range(self.nfft + self.read_delay):
                     ctx.set(self.dut0.rden, 1)
                     if j < self.nfft:
