@@ -51,20 +51,6 @@ async def run_test(dut):
             result = ((a**2 + b**2)**2 + (c<<16))>>16
             assert out == result
 
-def min_signed_bitwidth(x: int) -> int:
-    """Determine the minimum bit width needed to represent x as a signed integer."""
-    if x == 0:
-        return 1
-    elif x > 0:
-        return x.bit_length() + 1  # Add sign bit
-    else:
-        return (-x).bit_length() + 1
-
-def sign_extend(value: int, from_bits: int, to_bits: int = 81) -> int:
-    """Sign-extend a signed integer from from_bits to to_bits."""
-    sign_bit = 1 << (from_bits - 1)
-    return (value & (sign_bit - 1)) - (value & sign_bit)
-
 
 
 factory = TestFactory(run_test)
