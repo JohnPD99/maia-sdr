@@ -249,7 +249,7 @@ class S1_S2_module(Elaboratable):
                 with m.If((sum_counter==2) & ~do_abort):
                     m.d.sync += in_last_fft_vector.eq(1)
                 
-                with m.Else:
+                with m.Else():
                     # Last FFT vector is ending now
                     m.d.sync += in_last_fft_vector.eq(0)
 
@@ -261,7 +261,7 @@ class S1_S2_module(Elaboratable):
                         pingpong.eq(~pingpong),
                         do_abort.eq(0),
                     ]
-            with m.Else:
+            with m.Else():
                 m.d.sync += in_last_fft_vector.eq(in_last_fft_vector)
 
 
