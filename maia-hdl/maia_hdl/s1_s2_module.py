@@ -227,6 +227,15 @@ class S1_S2_module(Elaboratable):
                 not_first_sum_delay.eq(
                     Cat(not_first_sum, not_first_sum_delay[:-1])),
             ]
+            
+            # This Signal is high, when the last FFT vector starts
+            in_last_fft_vector = Signal() 
+            in_last_fft_vector_delay = [Signal() for _ in range(processing_delay)]
+            m.d.comb += in_last_fft_vector_delay[0].eq(in_last_fft_vector)
+            for i in range(1, processing_delay):
+                m.d.sync += in_last_fft_vector_delay[i].eq(in_last_fft_vector_delay[i-1])
+            
+
 
             with m.If(self.input_last):
                 # An FFT vector ends
@@ -236,6 +245,14 @@ class S1_S2_module(Elaboratable):
                     not_first_sum.eq(1),
                     sum_counter.eq(sum_counter - 1),
                 ]
+
+                with m.If((sum_counter==2) & ~do_abort):
+                    m.d.sync += in_last_fft_vector.eq(1)
+                
+                with m.Else:
+                    # Last FFT vector is ending now
+                    m.d.sync += in_last_fft_vector.eq(0)
+
                 with m.If((sum_counter == 1) | (sum_counter == 0) | do_abort):
                     # A new sum starts
                     m.d.sync += [
@@ -244,9 +261,14 @@ class S1_S2_module(Elaboratable):
                         pingpong.eq(~pingpong),
                         do_abort.eq(0),
                     ]
+            with m.Else:
+                m.d.sync += in_last_fft_vector.eq(in_last_fft_vector)
+
 
         with m.If(self.abort):
-            m.d.sync += do_abort.eq(1)
+            m.d.sync += [
+                do_abort.eq(1),
+                in_last_fft_vector.eq(0)]
 
         m.d.sync += pingpong_q.eq(pingpong_delay[-1])
 
