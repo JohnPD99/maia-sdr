@@ -96,6 +96,9 @@ class S1_S2_module(Elaboratable):
         self.sumw = 2*self.fw + 1 + self.nint_width_no_log
         self.sumw2 = 4*self.fw -1  + self.nint_width_no_log
 
+        self.kurt_width = 5
+        self.maxexponent = 4
+
         self.order_log2 = fft_order_log2
 
         self.to_fp = IQToFloatingPoint(self.w, self.fw)
@@ -109,14 +112,17 @@ class S1_S2_module(Elaboratable):
             self.fw, self.sumw2, self.ew, self.w - self.fw,
             a_complex=True, b_power=False, b_power_2=True)
         
-        #self.kurtosis_module = Kurtosis_Tresholder(self.sumw, self.sumw2)
+        self.kurtosis_module = Kurtosis_Tresholder(domain_3x,self.sumw,self.sumw2,
+                                                   self.ew, nint_width,self.kurt_width, 
+                                                   self.maxexponent, self.nint_width_no_log
+                                                   )
 
         self.cpwr = CpwrTR(domain_3x, self.fw, self.sumw)
         self.cpwr2 = Cpwr2TR(domain_3x, self.fw, self.sumw2)
 
         self.log2_nint = Signal(nint_width)
         self.abort = Signal()
-        #self.peak_detect = Signal()
+        
         self.clken = Signal()
         self.common_edge = Signal()
         self.input_last = Signal()
@@ -134,19 +140,43 @@ class S1_S2_module(Elaboratable):
 
     def model(self, log2_nint, re_in, im_in):
         re_in, im_in = (
-            np.array(x, 'int').reshape(-1, 2**log2_nint, 2**self.order_log2)
-            for x in [re_in, im_in])
+            np.array(x, dtype=object).reshape(-1, 2**log2_nint, 2**self.order_log2)
+            for x in [re_in, im_in]
+        )
         re_in, im_in, exp_in = self.to_fp.model(re_in, im_in)
-        acc, acc_exp = (np.zeros((re_in.shape[0], 2**self.order_log2), 'int')
-                        for _ in range(2))
+
+        acc, acc_exp = (np.zeros((re_in.shape[0], 2**self.order_log2), dtype=object)
+                for _ in range(2))
+        
+        acc2, acc2_exp = (np.zeros((re_in.shape[0], 2**self.order_log2), dtype=object)
+                for _ in range(2))
+        
         for j in range(2**log2_nint):
             re_in_c, im_in_c, acc_c, _, exp_c = self.common_exp.model(
                 re_in[:, j], im_in[:, j], exp_in[:, j],
                 acc, np.zeros_like(acc), acc_exp)
+            
+            re2_in_c, im2_in_c, acc2_c, _, exp2_c = self.common_exp2.model(
+                re_in[:, j], im_in[:, j], exp_in[:, j],
+                acc2, np.zeros_like(acc2), acc2_exp)
+
+
             cpwr_result = self.cpwr.model(
                 re_in_c, im_in_c, acc_c)
+            
+            cpwr2_result = self.cpwr.model(
+                re2_in_c, im2_in_c, acc2_c)
+
+
             acc[:] = cpwr_result
             acc_exp[:] = exp_c
+
+            acc2[:] = cpwr2_result
+            acc2_exp[:] = exp2_c
+
+        # perform kurtosis thresholding
+        # TODO
+
         # Bit reverse accumulator order
         acc = acc[:, [bit_invert(n, self.order_log2, 1)
                       for n in range(2**self.order_log2)]]
@@ -167,7 +197,7 @@ class S1_S2_module(Elaboratable):
         m.submodules.cpwr = cpwr = self.cpwr
         m.submodules.cpwr2 = cpwr2 = self.cpwr2
 
-        #m.submodules.kurt_thresh = kurtosis_module = self.kurtosis_module
+        m.submodules.kurt_thresh = kurtosis_module = self.kurtosis_module
 
         mems = [Memory(shape=self.sumw+self.ew, depth=2**self.order_log2,
                        init=[])
@@ -204,7 +234,7 @@ class S1_S2_module(Elaboratable):
         # to floating-point conversion. Since these operations have the same
         # delay, we do not need to delay any of them to align them.
         assert mem_delay == to_fp.delay
-        processing_delay = mem_delay + common_exp.delay + cpwr.delay
+        processing_delay = mem_delay + common_exp.delay + cpwr.delay + kurtosis_module.delay
 
         read_counter_rst = 0
         read_counter = Signal(self.order_log2, init=read_counter_rst)
@@ -230,9 +260,10 @@ class S1_S2_module(Elaboratable):
             
             # This Signal is high, when the last FFT vector starts
             in_last_fft_vector = Signal() 
-            in_last_fft_vector_delay = [Signal() for _ in range(processing_delay)]
-            m.d.comb += in_last_fft_vector_delay[0].eq(in_last_fft_vector)
-            for i in range(1, processing_delay):
+            in_last_fft_vector_delay = [Signal() for _ in range(processing_delay-kurtosis_module.delay)]
+            
+            m.d.sync += in_last_fft_vector_delay[0].eq(in_last_fft_vector)
+            for i in range(1, processing_delay-kurtosis_module.delay):
                 m.d.sync += in_last_fft_vector_delay[i].eq(in_last_fft_vector_delay[i-1])
             
 
@@ -341,6 +372,19 @@ class S1_S2_module(Elaboratable):
             cpwr2.im_in.eq(common_exp2.im_a_out),
             cpwr2.real_in.eq(common_exp2.b_out),
 
+            
+            kurtosis_module.clken.eq(self.clken),
+            kurtosis_module.common_edge.eq(self.common_edge),
+            kurtosis_module.cpwr_in.eq(cpwr.out),
+            kurtosis_module.log2_nint.eq(self.log2_nint),
+            kurtosis_module.cpwr2_in.eq(cpwr2.out),
+            kurtosis_module.exp_cpwr_in.eq(exp_delay[-1]),
+            kurtosis_module.exp_cpwr_in.eq(exp2_delay[-1]),
+            kurtosis_module.last_int.eq(in_last_fft_vector_delay[-1]),
+            kurtosis_module.kurt_shift_1.eq(2),
+            kurtosis_module.kurt_shift_2.eq(3),
+
+
 
             self.done.eq(pingpong_delay[-1] ^ pingpong_q),
             # We need to include pingpong_delay[1] here because otherwise the
@@ -364,11 +408,11 @@ class S1_S2_module(Elaboratable):
         for wr in wrports:
             m.d.comb += [
                 wr.addr.eq(write_counter_shift),
-                wr.data.eq(Cat(cpwr.out[:self.sumw], exp_delay[-1])),
+                wr.data.eq(Cat(kurtosis_module.cpwr_out[:self.sumw], kurtosis_module.exp_cpwr_out[-1])),
                 ]
         m.d.comb += [
             wrport2.addr.eq(write_counter_shift),
-            wrport2.data.eq(Cat(cpwr2.out[:self.sumw2], exp2_delay[-1]))
+            wrport2.data.eq(Cat(kurtosis_module.cpwr2_out[:self.sumw2], kurtosis_module.exp_cpwr2_out[-1]))
         ]
         return m
 

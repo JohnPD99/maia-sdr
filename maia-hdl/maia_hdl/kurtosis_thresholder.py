@@ -53,11 +53,6 @@ class Kurtosis_Tresholder(Elaboratable):
 
         #test signals
         self.max_widths = max(self.width_cpwr2 + self.nint_width_no_log, 2*self.width_cpwr +2)
-        self.test = Signal(signed( self.max_widths), reset_less=True)
-        self.test2 = Signal(signed( self.max_widths), reset_less=True)
-        self.test3 = Signal(signed( self.max_widths), reset_less=True)
-        self.test4 = Signal(signed( self.max_widths), reset_less=True)
-        self.test5 = Signal(signed( self.max_widths), reset_less=True)
 
         self.common_exp = MakeCommonExponent(
             self.width_cpwr, self.width_cpwr2, self.width_exp, self.max_exponent,
@@ -214,13 +209,6 @@ class Kurtosis_Tresholder(Elaboratable):
 
             # Tresholding
             m.d.sync += cpwr2_comparison.eq(cpwr2_mod_delay[-1]<<log2_nint_delay[-1])
-
-            m.d.comb += self.test.eq(((add5a_o > cpwr2_comparison) ))
-            m.d.comb += self.test2.eq((add5b_o < cpwr2_comparison))
-
-            m.d.comb += self.test3.eq((cpwr2_comparison))
-            m.d.comb += self.test4.eq((add5a_o))
-            m.d.comb += self.test5.eq((add5b_o))
 
             with m.If((add5a_o > cpwr2_comparison) & (add5b_o < cpwr2_comparison)):
                 m.d.comb += cpwr_o_prev.eq(cpwr_delay[-1])
