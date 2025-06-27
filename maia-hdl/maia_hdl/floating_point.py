@@ -338,8 +338,24 @@ class MakeCommonExponent(Elaboratable):
             diff_b *= 4
         if self.a_power_2:
             diff_a *= 4
-        return (re_a >> diff_a, im_a >> diff_a,
-                re_b >> diff_b, im_b >> diff_b,
+        return (re_a // (2**diff_a), im_a  // (2**diff_a),
+                re_b  // (2**diff_b), im_b  // (2**diff_b),
+                max_exponent)
+    
+    def model2(self, re_a, im_a, exponent_a, re_b, im_b, exponent_b):
+        max_exponent = max(exponent_a, exponent_b)
+        diff_a = max_exponent - exponent_a
+        diff_b = max_exponent - exponent_b
+        if self.a_power:
+            diff_a *= 2
+        if self.b_power:
+            diff_b *= 2
+        if self.b_power_2:
+            diff_b *= 4
+        if self.a_power_2:
+            diff_a *= 4
+        return (re_a // (2**diff_a), im_a  // (2**diff_a),
+                re_b  // (2**diff_b), im_b  // (2**diff_b),
                 max_exponent)
 
     def elaborate(self, platform):
@@ -388,13 +404,13 @@ class MakeCommonExponent(Elaboratable):
                 self.aw, self.ew, self.max_exp,
                 is_signed=self.is_a_signed, is_power=self.a_power, is_power_2=self.a_power_2)
             m.d.comb += [
-                m.submodules.shift_a.in_data.eq(re_a_q),
+                m.submodules.shift_a.in_data.eq(a_q),
                 m.submodules.shift_a.shift.eq(diff_a),
             ]
             with m.If(self.clken):
                 m.d.sync += [
                     a_q.eq(self.a_in),
-                    self.a_out.eq(m.d.submodules.shift_a.out_data),
+                    self.a_out.eq(m.submodules.shift_a.out_data),
                 ]
 
         if self.b_complex:

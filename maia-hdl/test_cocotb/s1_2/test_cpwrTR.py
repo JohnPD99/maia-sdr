@@ -18,9 +18,7 @@ async def run_test(dut):
     dut.rst.value = 1
     dut.clk3x_rst.value = 1
     dut.clken.value = 1
-    dut.re_in.value = 0
-    dut.im_in.value = 0
-    dut.real_in.value = 0
+    dut.a.value = 0
     cocotb.start_soon(Clock(dut.clk, 12, units='ns').start())
     cocotb.start_soon(Clock(dut.clk3x_clk, 4, units='ns').start())
     # We need to wait for 100 ns for GSR to go low
@@ -30,24 +28,17 @@ async def run_test(dut):
 
     rising = RisingEdge(dut.clk)
     num_inputs = 1000
-    dut_delay = 8  # needs to be one more than the DUT delay @property
-
-    re_in, im_in = (
-        [random.randrange(-2**15, 2**15) for _ in range(num_inputs)]
-        for _ in range(2))
-    real_in = [random.randrange(-2**23, 2**23) for _ in range(num_inputs)]
+    dut_delay = 6  # needs to be one more than the DUT delay @property
+    real_in = [random.randrange(0, 2**46-1) for _ in range(num_inputs)]
 
     for j in range(num_inputs):
         await rising
-        dut.re_in.value = re_in[j]
-        dut.im_in.value = im_in[j]
-        dut.real_in.value = real_in[j]
+        dut.a.value = real_in[j]
         if j >= dut_delay:
-            a = re_in[j - dut_delay]
-            b = im_in[j - dut_delay]
-            c = real_in[j - dut_delay]
+            val = real_in[j - dut_delay]
             out = dut.out.value.signed_integer
-            assert out == (a**2 + b**2 + (c << 16)) >> 16
+            expected = val**2
+            assert out == expected
 
 
 factory = TestFactory(run_test)
