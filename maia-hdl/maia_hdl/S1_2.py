@@ -93,15 +93,16 @@ class S1_2(Elaboratable):
         common_edge_q = Signal()
         common_edge_qq = Signal()
 
+
+        # spliting up cpwr for squaring
+
+        m.d.comb += [
+            cpwr_l.eq(Cat(self.a[:17], Const(0,1))),
+            cpwr_m.eq(Cat(self.a[17:34], Const(0, 1))),
+            cpwr_h.eq(Cat(self.a[34:], Const(0,1))),
+        ]
+
         with m.If(self.clken):
-
-            # spliting up cpwr for squaring
-
-            m.d.comb += [
-                cpwr_l.eq(Cat(self.a[:17], Const(0,1))),
-                cpwr_m.eq(Cat(self.a[17:34], Const(0, 1))),
-                cpwr_h.eq(Cat(self.a[34:], Const(0,1))),
-            ]
 
             # DSPs
 
@@ -388,47 +389,66 @@ class S1_2(Elaboratable):
         common_edge_q = Signal()
         common_edge_qq = Signal()
 
-        with m.If(self.clken):
+         # spliting up cpwr for squaring
 
-            # spliting up cpwr for squaring
+        m.d.comb += [
+            cpwr_l.eq(Cat(self.a[:17], Const(0,1))),
+            cpwr_m.eq(Cat(self.a[17:34], Const(0, 1))),
+            cpwr_h.eq(Cat(self.a[34:], Const(0,1))),
+        ]
 
+        # DSP1
+        m.d.comb += [
+            dsp1_a1.eq(cpwr_m),
+            dsp1_b1.eq(cpwr_l),
+        ]
+
+        with m.If(self.common_edge):
             m.d.comb += [
-                cpwr_l.eq(Cat(self.a[:17], Const(0,1))),
-                cpwr_m.eq(Cat(self.a[17:34], Const(0, 1))),
-                cpwr_h.eq(Cat(self.a[34:], Const(0,1))),
+                dsp1_a1.eq(cpwr_l),
+                dsp1_b1.eq(cpwr_l),
+            ]
+        
+        with m.If(common_edge_qq):
+            m.d.comb += [
+                dsp1_a1.eq(cpwr_m),
+                dsp1_b1.eq(cpwr_m)
             ]
 
-            # DSPs
+         # DSP2
 
+        m.d.comb += [
+            dsp2_a1.eq(cpwr_h),
+            dsp2_b1.eq(cpwr_h),
+        ]
+
+        with m.If(self.common_edge):
+            m.d.comb += [
+                dsp2_a1.eq(cpwr_l),
+                dsp2_b1.eq(cpwr_h),
+            ]
+        
+        with m.If(common_edge_q):
+            m.d.comb += [
+                dsp2_a1.eq(cpwr_h),
+                dsp2_b1.eq(cpwr_m),
+            ]
+
+
+        with m.If(self.clken):
+
+            # DSPs
             m.d[self._3x] += [
                 common_edge_q.eq(self.common_edge),
                 common_edge_qq.eq(common_edge_q)
             ]
 
-
-            # DSP1
-
-            m.d.comb += [
-                dsp1_a1.eq(cpwr_m),
-                dsp1_b1.eq(cpwr_l),
-            ]
-
             with m.If(self.common_edge):
-                m.d.comb += [
-                    dsp1_a1.eq(cpwr_l),
-                    dsp1_b1.eq(cpwr_l),
-                ]
                 m.d[self._3x] += add_ll.eq(dsp1_p)
 
             with m.If(common_edge_q):
                 m.d[self._3x] += [
                     add_lm.eq(dsp1_p)
-                ]
-            
-            with m.If(common_edge_qq):
-                m.d.comb += [
-                    dsp1_a1.eq(cpwr_m),
-                    dsp1_b1.eq(cpwr_m)
                 ]
             
             m.d.sync += [
@@ -439,27 +459,14 @@ class S1_2(Elaboratable):
             
             # DSP2
 
-            m.d.comb += [
-                dsp2_a1.eq(cpwr_h),
-                dsp2_b1.eq(cpwr_h),
-            ]
-
             with m.If(self.common_edge):
                 m.d[self._3x] += [
                     add_lh.eq(dsp2_p)
-                ]
-                m.d.comb += [
-                    dsp2_a1.eq(cpwr_l),
-                    dsp2_b1.eq(cpwr_h),
                 ]
             
             with m.If(common_edge_q):
                 m.d[self._3x] += [
                     add_mh.eq(dsp2_p)
-                ]
-                m.d.comb += [
-                    dsp2_a1.eq(cpwr_h),
-                    dsp2_b1.eq(cpwr_m),
                 ]
 
             m.d.sync += [

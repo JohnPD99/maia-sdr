@@ -134,6 +134,8 @@ class S1_S2_module(Elaboratable):
         self.rdata_exponent = Signal(self.ew)
         self.rden = Signal()
 
+        self.test = Signal()
+
     @property
     def model_vlen(self, log2_nint):
         return 2**self.order_log2 * (2**log2_nint)
@@ -164,7 +166,7 @@ class S1_S2_module(Elaboratable):
             cpwr_result = self.cpwr.model(
                 re_in_c, im_in_c, acc_c)
             
-            cpwr2_result = self.cpwr.model(
+            cpwr2_result = self.cpwr2.model(
                 re2_in_c, im2_in_c, acc2_c)
 
 
@@ -173,10 +175,14 @@ class S1_S2_module(Elaboratable):
 
             acc2[:] = cpwr2_result
             acc2_exp[:] = exp2_c
-
+        
         # perform kurtosis thresholding
-        # TODO
-
+        for batch in range(re_in.shape[0]):
+            for bin in range(2**self.order_log2):
+                acc[batch, bin] = self.kurtosis_module.model(acc[batch, bin], acc2[batch, bin],
+                                                             acc_exp[batch,bin], acc2_exp[batch,bin],
+                                                             log2_nint, 2, 3, 1)
+       
         # Bit reverse accumulator order
         acc = acc[:, [bit_invert(n, self.order_log2, 1)
                       for n in range(2**self.order_log2)]]
@@ -249,25 +255,22 @@ class S1_S2_module(Elaboratable):
         pingpong_q = Signal(reset_less=False)
         do_abort = Signal()
 
+
+        # additional signals
+        last_fft = Signal(reset_less=True)
+        last_fft_delay = Signal(processing_delay-1,reset_less=True) ## The kurtosis module expects the last_fft signal one cycle before the output
+
+        
         with m.If(self.clken):
             m.d.sync += [
                 read_counter.eq(read_counter + 1),
                 write_counter.eq(write_counter + 1),
                 pingpong_delay.eq(Cat(pingpong, pingpong_delay[:-1])),
+                last_fft_delay.eq(Cat(last_fft, last_fft_delay[:-1])),
                 not_first_sum_delay.eq(
                     Cat(not_first_sum, not_first_sum_delay[:-1])),
             ]
             
-            # This Signal is high, when the last FFT vector starts
-            in_last_fft_vector = Signal() 
-            in_last_fft_vector_delay = [Signal() for _ in range(processing_delay-kurtosis_module.delay)]
-            
-            m.d.sync += in_last_fft_vector_delay[0].eq(in_last_fft_vector)
-            for i in range(1, processing_delay-kurtosis_module.delay):
-                m.d.sync += in_last_fft_vector_delay[i].eq(in_last_fft_vector_delay[i-1])
-            
-
-
             with m.If(self.input_last):
                 # An FFT vector ends
                 m.d.sync += [
@@ -277,12 +280,10 @@ class S1_S2_module(Elaboratable):
                     sum_counter.eq(sum_counter - 1),
                 ]
 
-                with m.If((sum_counter==2) & ~do_abort):
-                    m.d.sync += in_last_fft_vector.eq(1)
-                
+                with m.If(sum_counter == 2):
+                    m.d.sync += last_fft.eq(1)
                 with m.Else():
-                    # Last FFT vector is ending now
-                    m.d.sync += in_last_fft_vector.eq(0)
+                    m.d.sync += last_fft.eq(0)
 
                 with m.If((sum_counter == 1) | (sum_counter == 0) | do_abort):
                     # A new sum starts
@@ -291,15 +292,15 @@ class S1_S2_module(Elaboratable):
                         not_first_sum.eq(0),
                         pingpong.eq(~pingpong),
                         do_abort.eq(0),
+                        last_fft.eq(0)
                     ]
-            with m.Else():
-                m.d.sync += in_last_fft_vector.eq(in_last_fft_vector)
 
 
         with m.If(self.abort):
             m.d.sync += [
                 do_abort.eq(1),
-                in_last_fft_vector.eq(0)]
+                last_fft.eq(0)
+            ]
 
         m.d.sync += pingpong_q.eq(pingpong_delay[-1])
 
@@ -308,6 +309,7 @@ class S1_S2_module(Elaboratable):
         # fftshift.
         read_counter_rev = read_counter[::-1]
         write_counter_rev = write_counter[::-1]
+
         read_counter_shift = Cat(read_counter_rev[:-1],
                                  ~read_counter_rev[-1])
         write_counter_shift = Cat(write_counter_rev[:-1],
@@ -316,7 +318,7 @@ class S1_S2_module(Elaboratable):
         exp_delay = [Signal(self.ew, name=f'exp_q_{j}', reset_less=True)
                      for j in range(cpwr.delay)]
         exp2_delay = [Signal(self.ew, name=f'exp2_q_{j}', reset_less=True)
-                     for j in range(cpwr.delay)]
+                     for j in range(cpwr2.delay)]
         
         with m.If(self.clken):
             m.d.sync += exp_delay[0].eq(common_exp.exponent_out)
@@ -331,6 +333,9 @@ class S1_S2_module(Elaboratable):
         rdata = Mux(pingpong, rdports_reg[0], rdports_reg[1])
 
         m.d.comb += [
+
+            self.test.eq(last_fft_delay[0]),
+
             to_fp.clken.eq(self.clken),
             to_fp.re_in.eq(self.re_in),
             to_fp.im_in.eq(self.im_in),
@@ -376,13 +381,15 @@ class S1_S2_module(Elaboratable):
             kurtosis_module.clken.eq(self.clken),
             kurtosis_module.common_edge.eq(self.common_edge),
             kurtosis_module.cpwr_in.eq(cpwr.out),
-            kurtosis_module.log2_nint.eq(self.log2_nint),
             kurtosis_module.cpwr2_in.eq(cpwr2.out),
             kurtosis_module.exp_cpwr_in.eq(exp_delay[-1]),
-            kurtosis_module.exp_cpwr_in.eq(exp2_delay[-1]),
-            kurtosis_module.last_int.eq(in_last_fft_vector_delay[-1]),
+            kurtosis_module.exp_cpwr2_in.eq(exp2_delay[-1]),
+            
+            kurtosis_module.log2_nint.eq(self.log2_nint),
             kurtosis_module.kurt_shift_1.eq(2),
             kurtosis_module.kurt_shift_2.eq(3),
+            
+            kurtosis_module.last_int.eq(last_fft_delay[-1]),
 
 
 
@@ -394,6 +401,7 @@ class S1_S2_module(Elaboratable):
                                  self.rden, self.clken)),
             rdports[1].en.eq(Mux(pingpong | pingpong_delay[mem_delay - 1],
                                  self.clken, self.rden)),
+            
             rdport2.en.eq(self.clken),
             rdports[0].addr.eq(Mux(pingpong, self.rdaddr, read_counter_shift)),
             rdports[1].addr.eq(Mux(pingpong, read_counter_shift, self.rdaddr)),
@@ -408,16 +416,16 @@ class S1_S2_module(Elaboratable):
         for wr in wrports:
             m.d.comb += [
                 wr.addr.eq(write_counter_shift),
-                wr.data.eq(Cat(kurtosis_module.cpwr_out[:self.sumw], kurtosis_module.exp_cpwr_out[-1])),
+                wr.data.eq(Cat(kurtosis_module.cpwr_out[:self.sumw], kurtosis_module.exp_cpwr_out)),
                 ]
         m.d.comb += [
             wrport2.addr.eq(write_counter_shift),
-            wrport2.data.eq(Cat(kurtosis_module.cpwr2_out[:self.sumw2], kurtosis_module.exp_cpwr2_out[-1]))
+            wrport2.data.eq(Cat(kurtosis_module.cpwr2_out[:self.sumw2], kurtosis_module.exp_cpwr2_out))
         ]
         return m
 
 if __name__ == '__main__':
-    integrator = S1_S2_module('clk_3x', 22, 18, 10, 12)
+    integrator = S1_S2_module('clk_3x', 22, 18, 5, 12)
     amaranth.cli.main(
         integrator, ports=[
             integrator.clken, integrator.log2_nint,

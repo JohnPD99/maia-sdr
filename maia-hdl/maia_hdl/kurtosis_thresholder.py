@@ -137,17 +137,22 @@ class Kurtosis_Tresholder(Elaboratable):
             common_exp.clken.eq(self.clken),
         ]
 
-
-        m.d.sync += cpwr2_mod_delay[0].eq(common_exp.b_out)
-
         m.d.comb += [
-            s1_2.clken.eq(1),
+            s1_2.clken.eq(self.clken),
             s1_2.a.eq(common_exp.a_out),
             s1_2.common_edge.eq(self.common_edge),
             add4_result.eq(s1_2.out)
         ]
 
+        m.d.comb += [
+            self.exp_cpwr_out.eq(exp_cpwr_delay[-1]),
+            self.exp_cpwr2_out.eq(exp_cpwr2_delay[-1]),
+            self.cpwr2_out.eq(cpwr2_delay[-1])
+        ]
+
         with m.If(self.clken):
+
+            m.d.sync += cpwr2_mod_delay[0].eq(common_exp.b_out)
 
             # Delay pipelines for cpwr, cpwr2, exp_cpwr and exp_cpwr2
 
@@ -167,15 +172,11 @@ class Kurtosis_Tresholder(Elaboratable):
                 cpwr2_delay[0].eq(self.cpwr2_in),
                 exp_cpwr2_delay[0].eq(self.exp_cpwr2_in),
             ]
-            
-            m.d.comb += [
-                self.exp_cpwr_out.eq(exp_cpwr_delay[-1]),
-                self.exp_cpwr2_out.eq(exp_cpwr2_delay[-1]),
-                self.cpwr2_out.eq(cpwr2_delay[-1])
+
+            m.d.sync += [
+                self.cpwr_out.eq(cpwr_o_prev)
             ]
 
-
-        with m.If(self.last_int & self.clken):
 
             # for bitshifting
 
@@ -190,14 +191,6 @@ class Kurtosis_Tresholder(Elaboratable):
                 m.d.sync += cpwr2_mod_delay[i].eq(cpwr2_mod_delay[i-1])
 
 
-            # Kurtosis right shift and left shift
-
-            m.d.comb += [
-                shift_2.eq(add4_result << 1),
-                kurt_shift_1.eq(add4_result >> self.kurt_shift_1),
-                kurt_shift_2.eq(add4_result >> self.kurt_shift_2)
-            ]
-
             m.d.sync += [
                 add5a_a.eq(shift_2 + kurt_shift_1),
                 add5a_b.eq(kurt_shift_2),
@@ -210,26 +203,29 @@ class Kurtosis_Tresholder(Elaboratable):
             # Tresholding
             m.d.sync += cpwr2_comparison.eq(cpwr2_mod_delay[-1]<<log2_nint_delay[-1])
 
+        # Kurtosis right shift and left shift
+        m.d.comb += [
+            shift_2.eq(add4_result << 1),
+            kurt_shift_1.eq(add4_result >> self.kurt_shift_1),
+            kurt_shift_2.eq(add4_result >> self.kurt_shift_2)
+        ]
+
+
+        with m.If(self.last_int):
             with m.If((add5a_o > cpwr2_comparison) & (add5b_o < cpwr2_comparison)):
                 m.d.comb += cpwr_o_prev.eq(cpwr_delay[-1])
             with m.Else():
                 m.d.comb += cpwr_o_prev.eq(0b0)
-            
-            m.d.sync += [
-                self.cpwr_out.eq(cpwr_o_prev)
-            ]
-        
         with m.Else():
-            
             m.d.comb += cpwr_o_prev.eq(cpwr_delay[-1])
-            m.d.sync += self.cpwr_out.eq(cpwr_o_prev)
+           
         
         return m
 
 
 
 if __name__ == '__main__':
-    kurt_thresh = Kurtosis_Tresholder(37,82,3,5,5,5,4,10)
+    kurt_thresh = Kurtosis_Tresholder('clk_3x',37,82,3,5,5,5,4,10)
     amaranth.cli.main(
         kurt_thresh, ports=[kurt_thresh.cpwr_in, kurt_thresh.cpwr2_in, kurt_thresh.exp_cpwr_in, kurt_thresh.exp_cpwr2_in
                             , kurt_thresh.cpwr_out, kurt_thresh.cpwr2_out, kurt_thresh.exp_cpwr_out, kurt_thresh.exp_cpwr2_out,

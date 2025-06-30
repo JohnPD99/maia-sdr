@@ -170,16 +170,17 @@ class Cpwr2TR(Elaboratable):
 
             # cpwr2
 
-            m.d.comb += [pwr_x.eq(preg_out[0]),
-                         pwr_l.eq(Cat(preg_out[1:self.w], Const(0, 1))),
-                         pwr_h.eq(Cat(preg_out[self.w:2*self.w-1], Const(0,1))),
-                         add1_a.eq(pwr_h.as_unsigned() << self.w+1),
-                         add1_b.eq((pwr_l.as_unsigned() << 2) | 1),
-                         add1_res.eq(add1_a_q + add1_b_q),
-                         #self.test.eq(add_real)
-                         ]
+        m.d.comb += [pwr_x.eq(preg_out[0]),
+                        pwr_l.eq(Cat(preg_out[1:self.w], Const(0, 1))),
+                        pwr_h.eq(Cat(preg_out[self.w:2*self.w-1], Const(0,1))),
+                        add1_a.eq(pwr_h.as_unsigned() << self.w+1),
+                        add1_b.eq((pwr_l.as_unsigned() << 2) | 1),
+                        add1_res.eq(add1_a_q + add1_b_q),
+                        #self.test.eq(add_real)
+                        ]
 
-
+        with m.If(self.clken):
+            
             m.d[self._3x] += [
                 p2reg_a.eq(pwr_l),
                 p2reg_b.eq(pwr_h),
@@ -438,6 +439,47 @@ class Cpwr2TR(Elaboratable):
         common_edge_qq = Signal()
 
 
+        m.d.comb += [
+            dsp1_a1.eq(self.im_in),
+            dsp1_b1.eq(self.im_in),
+            # M
+            dsp1_opmode.eq(0b000_01_01),  
+        ]
+
+        with m.If(self.common_edge):
+            m.d.comb += [
+                dsp1_a1.eq(self.re_in),
+                dsp1_b1.eq(self.re_in),
+                    # M + P
+                dsp1_opmode.eq(0b010_01_01),
+            ]
+
+        m.d.comb += [
+            # spliting up pwr into 3 parts
+            pwr_x.eq(preg_out[0]),
+            pwr_l.eq(Cat(preg_out[1:self.w], Const(0, 1))),
+            pwr_h.eq(Cat(preg_out[self.w:2*self.w-1], Const(0,1))),
+            # small fabric adder
+            add1_a.eq(pwr_h.as_unsigned() << self.w+1),
+            add1_b.eq((pwr_l.as_unsigned() << 2) | 1),
+            add1_res.eq(add1_a_q + add1_b_q),
+            dsp2_a1.eq(pwr_l),
+            dsp2_b1.eq(pwr_h)
+        ]
+
+        with m.If(self.common_edge):
+            m.d.comb += [
+                dsp2_a1.eq(pwr_h),
+                dsp2_b1.eq(pwr_h),
+            ]
+        
+        with m.If(common_edge_q):
+                m.d.comb += [
+                    dsp2_a1.eq(pwr_l),
+                    dsp2_b1.eq(pwr_l),
+                ]
+
+
         with m.If(self.clken):
 
             # Power calculation
@@ -449,52 +491,18 @@ class Cpwr2TR(Elaboratable):
            
             m.d.sync += preg_out.eq(dsp1_p),
 
-            m.d.comb += [
-                dsp1_a1.eq(self.im_in),
-                dsp1_b1.eq(self.im_in),
-                # M
-                dsp1_opmode.eq(0b000_01_01),  
-            ]
-            with m.If(self.common_edge):
-                m.d.comb += [
-                    dsp1_a1.eq(self.re_in),
-                    dsp1_b1.eq(self.re_in),
-                     # M + P
-                    dsp1_opmode.eq(0b010_01_01),
-                ]
-
+           
             # Squaring power and adding it to real_in
-
-            m.d.comb += [
-                # spliting up pwr into 3 parts
-                pwr_x.eq(preg_out[0]),
-                pwr_l.eq(Cat(preg_out[1:self.w], Const(0, 1))),
-                pwr_h.eq(Cat(preg_out[self.w:2*self.w-1], Const(0,1))),
-                # small fabric adder
-                add1_a.eq(pwr_h.as_unsigned() << self.w+1),
-                add1_b.eq((pwr_l.as_unsigned() << 2) | 1),
-                add1_res.eq(add1_a_q + add1_b_q),
-                dsp2_a1.eq(pwr_l),
-                dsp2_b1.eq(pwr_h)
-            ]
 
             with m.If(self.common_edge):
                 m.d[self._3x] += [
                     p2reg_hh_temp.eq(dsp2_p)
-                ]
-                m.d.comb += [
-                    dsp2_a1.eq(pwr_h),
-                    dsp2_b1.eq(pwr_h),
                 ]
             
             with m.If(common_edge_q):
 
                 m.d[self._3x] += [
                     p2reg_ll_temp.eq(dsp2_p)
-                ]
-                m.d.comb += [
-                    dsp2_a1.eq(pwr_l),
-                    dsp2_b1.eq(pwr_l),
                 ]
 
             m.d.sync += [
