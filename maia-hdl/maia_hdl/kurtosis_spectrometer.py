@@ -67,7 +67,6 @@ class Kurthosis_Spectrometer(Elaboratable):
         self._domain_3x = domain_3x
         self.fft_order_log2 = 12
         self.width_in = 16
-
         self.nint_width = 5
 
         self.dma = DmaBRAMWrite(

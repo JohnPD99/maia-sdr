@@ -25,10 +25,10 @@ class TestSpectrumIntegrator(AmaranthSim):
         self.domain_3x = 'clk3x'
 
     def test_model(self):
-        self.fft_order_log2 = 8
+        self.fft_order_log2 = 5
         self.nfft = 2**self.fft_order_log2
         for peak_detect in [False, True]:
-            for integrations in [5, 2]:
+            for integrations in [9, 2]:
                 with self.subTest(integrations=integrations,
                                   peak_detect=peak_detect):
                     self.common_model(integrations, peak_detect)

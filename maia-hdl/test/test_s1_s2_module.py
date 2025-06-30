@@ -26,10 +26,10 @@ class TestSpectrumIntegrator(AmaranthSim):
         self.domain_3x = 'clk3x'
 
     def test_model(self):
-        self.fft_order_log2 = 8
+        self.fft_order_log2 = 5
         self.nfft = 2**self.fft_order_log2
         #self.common_constant_input
-        for log2_integrations in [2,5]:
+        for log2_integrations in [2,9]:
             with self.subTest(log2_integrations=log2_integrations):
                 self.common_model(log2_integrations)
 
@@ -102,6 +102,7 @@ class TestSpectrumIntegrator(AmaranthSim):
                     ((n + 1) * (2**log2_integrations) + 1) * self.nfft)
                 expected = self.dut0.model(
                     log2_integrations, re_in[sel], im_in[sel])
+                print(expected)
                 await check_ram(*expected)
 
         self.simulate([set_inputs, check_ram_contents],

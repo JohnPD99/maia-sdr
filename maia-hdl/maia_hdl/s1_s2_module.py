@@ -181,7 +181,7 @@ class S1_S2_module(Elaboratable):
             for bin in range(2**self.order_log2):
                 acc[batch, bin] = self.kurtosis_module.model(acc[batch, bin], acc2[batch, bin],
                                                              acc_exp[batch,bin], acc2_exp[batch,bin],
-                                                             log2_nint, 2, 3, 1)
+                                                             log2_nint, 1, 3, 1)
        
         # Bit reverse accumulator order
         acc = acc[:, [bit_invert(n, self.order_log2, 1)
@@ -386,7 +386,7 @@ class S1_S2_module(Elaboratable):
             kurtosis_module.exp_cpwr2_in.eq(exp2_delay[-1]),
             
             kurtosis_module.log2_nint.eq(self.log2_nint),
-            kurtosis_module.kurt_shift_1.eq(2),
+            kurtosis_module.kurt_shift_1.eq(1),
             kurtosis_module.kurt_shift_2.eq(3),
             
             kurtosis_module.last_int.eq(last_fft_delay[-1]),
