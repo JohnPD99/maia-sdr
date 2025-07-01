@@ -389,7 +389,7 @@ class S1_S2_module(Elaboratable):
             kurtosis_module.kurt_shift_1.eq(1),
             kurtosis_module.kurt_shift_2.eq(3),
             
-            kurtosis_module.last_int.eq(last_fft_delay[-1]),
+            kurtosis_module.last_int.eq(last_fft_delay[-1]), #usually set to delay_last_int[-1]
 
 
 
