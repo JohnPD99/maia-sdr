@@ -1098,10 +1098,10 @@ module"]
         pub type UseDdcOutR = crate::BitReader;
         #[doc = "Field `use_ddc_out` writer - use_ddc_out"]
         pub type UseDdcOutW<'a, REG> = crate::BitWriter<'a, REG>;
-        #[doc = "Field `num_integrations` reader - num_integrations"]
-        pub type NumIntegrationsR = crate::FieldReader<u16>;
-        #[doc = "Field `num_integrations` writer - num_integrations"]
-        pub type NumIntegrationsW<'a, REG> = crate::FieldWriter<'a, REG, 10, u16>;
+        #[doc = "Field `integrations_exp` reader - integrations_exp"]
+        pub type IntegrationsExpR = crate::FieldReader<u16>;
+        #[doc = "Field `integrations_exp` writer - integrations_exp"]
+        pub type IntegrationsExpW<'a, REG> = crate::FieldWriter<'a, REG, 10, u16>;
         #[doc = "Field `abort` writer - abort"]
         pub type AbortW<'a, REG> = crate::BitWriter<'a, REG>;
         #[doc = "Field `last_buffer` reader - last_buffer"]
@@ -1116,10 +1116,10 @@ module"]
             pub fn use_ddc_out(&self) -> UseDdcOutR {
                 UseDdcOutR::new((self.bits & 1) != 0)
             }
-            #[doc = "Bits 1:10 - num_integrations"]
+            #[doc = "Bits 1:10 - integrations_exp"]
             #[inline(always)]
-            pub fn num_integrations(&self) -> NumIntegrationsR {
-                NumIntegrationsR::new(((self.bits >> 1) & 0x03ff) as u16)
+            pub fn integrations_exp(&self) -> IntegrationsExpR {
+                IntegrationsExpR::new(((self.bits >> 1) & 0x03ff) as u16)
             }
             #[doc = "Bits 12:14 - last_buffer"]
             #[inline(always)]
@@ -1142,8 +1142,8 @@ module"]
             #[doc = "Bits 1:10 - num_integrations"]
             #[inline(always)]
             #[must_use]
-            pub fn num_integrations(&mut self) -> NumIntegrationsW<SpectrometerSpec> {
-                NumIntegrationsW::new(self, 1)
+            pub fn integrations_exp(&mut self) -> IntegrationsExpW<SpectrometerSpec> {
+                IntegrationsExpW::new(self, 1)
             }
             #[doc = "Bit 11 - abort"]
             #[inline(always)]

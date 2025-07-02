@@ -534,7 +534,7 @@ class TRTSDR(Elaboratable):
                               Access.RW,
                               1,
                               0),
-                        Field('num_integrations',
+                        Field('integrations_exp',
                               Access.RW,
                               self.spectrometer.nint_width*2,
                               -1),
@@ -728,7 +728,7 @@ class TRTSDR(Elaboratable):
             self.spectrometer.re_in.eq(spectrometer_re_in),
             self.spectrometer.im_in.eq(spectrometer_im_in),
             sync_spectrometer_interrupt.i.eq(self.spectrometer.interrupt_out),
-            self.spectrometer.log2_number_integrations.eq(self.sdr_registers['spectrometer']['num_integrations']>>6),
+            self.spectrometer.log2_number_integrations.eq(self.sdr_registers['spectrometer']['integrations_exp']),
             self.spectrometer.abort.eq(
                 self.sdr_registers['spectrometer']['abort']),
             self.sdr_registers['spectrometer']['last_buffer'].eq(

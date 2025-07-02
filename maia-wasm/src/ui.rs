@@ -103,8 +103,8 @@ ui_elements! {
     ddc_output_sampling_frequency: HtmlSpanElement => NumberSpan<f64, input::MHzPresentation>,
     ddc_max_input_sampling_frequency: HtmlSpanElement => NumberSpan<f64, input::MHzPresentation>,
     spectrometer_input: HtmlSelectElement => EnumInput<maia_json::SpectrometerInput>,
-    spectrometer_output_sampling_frequency: HtmlInputElement
-        => NumberInput<f64, input::IntegerPresentation>,
+    spectrometer_integrations_exp: HtmlInputElement
+        => NumberInput<u32, input::IntegerPresentation>,
     spectrometer_mode: HtmlSelectElement => EnumInput<maia_json::SpectrometerMode>,
     recording_metadata_filename: HtmlInputElement => TextInput,
     recorder_prepend_timestamp: HtmlInputElement => CheckboxInput,
@@ -183,7 +183,7 @@ impl Ui {
             ad9361_rx_gain_mode,
             ddc_frequency,
             spectrometer_input,
-            spectrometer_output_sampling_frequency,
+            spectrometer_integrations_exp,
             spectrometer_mode,
             recording_metadata_filename,
             recorder_prepend_timestamp,
@@ -965,7 +965,7 @@ impl Ui {
         maia_json::PatchSpectrometer,
         SPECTROMETER_URL,
         input,
-        output_sampling_frequency,
+        integrations_exp,
         mode
     );
     impl_post_patch_update_elements_noop!(spectrometer, maia_json::PatchSpectrometer);
@@ -985,11 +985,11 @@ impl Ui {
                 .api_state
                 .borrow()
                 .as_ref()
-                .map(|s| s.spectrometer.output_sampling_frequency)
+                .map(|s| s.spectrometer.integrations_exp)
             {
                 // if the format of the element fails, there is not much we can
                 // do
-                json.output_sampling_frequency = Some(freq);
+                json.integrations_exp = Some(freq);
             }
         }
     }
@@ -998,7 +998,7 @@ impl Ui {
     // to update the spectrometer settings maintaining the current rate.
     fn update_spectrometer_settings(&self) -> Result<(), JsValue> {
         self.elements
-            .spectrometer_output_sampling_frequency
+            .spectrometer_integrations_exp
             .onchange()
             .unwrap()
             .call0(&JsValue::NULL)?;
@@ -1157,8 +1157,26 @@ impl Ui {
     }
 
     fn update_waterfall_rate(&self, json: &maia_json::Spectrometer) {
+          // Estimate input sampling frequency (choose the correct one based on the input)
+        let state = self.api_state.borrow();
+        let Some(state) = state.as_ref() else {
+            web_sys::console::error_1(&"update_waterfall_rate: no api state".into());
+            return;
+        };
+
+        let input_sampling_frequency = match json.input {
+            maia_json::SpectrometerInput::AD9361 => state.ad9361.sampling_frequency as f32,
+            maia_json::SpectrometerInput::DDC => state.ddc.output_sampling_frequency as f32,
+        };
+
+        // FFT length is fixed — confirm from your setup (e.g. 1024 or 2048)
+        const FFT_LEN: f32 = 4096.0;
+
+        // Calculate rate = Fs / Nfft / 2^exp
+        let rate = input_sampling_frequency / FFT_LEN / (1 << json.integrations_exp) as f32;
+
         self.waterfall
             .borrow_mut()
-            .set_waterfall_update_rate(json.output_sampling_frequency as f32);
+            .set_waterfall_update_rate(rate);
     }
 }

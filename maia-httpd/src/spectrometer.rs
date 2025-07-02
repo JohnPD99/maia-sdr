@@ -68,7 +68,8 @@ impl Spectrometer {
             self.interrupt.wait().await;
             let (samp_rate, mode) = self.state.spectrometer_config().samp_rate_mode();
             let mut ip_core = self.state.ip_core().lock().unwrap();
-            let num_integrations = ip_core.spectrometer_number_integrations() as f32;
+            let integrations_exp = ip_core.spectrometer_integrations_exp() as u32;
+            let num_integrations = (1u32 << integrations_exp) as f32; 
             let scale = match mode {
                 SpectrometerMode::Average => BASE_SCALE / (num_integrations * samp_rate),
                 SpectrometerMode::PeakDetect => BASE_SCALE / samp_rate,
@@ -76,7 +77,7 @@ impl Spectrometer {
             tracing::trace!(
                 last_buffer = ip_core.spectrometer_last_buffer(),
                 samp_rate,
-                num_integrations,
+                integrations_exp,
                 scale
             );
             // TODO: potential optimization: do not hold the mutex locked while

@@ -247,7 +247,7 @@ class S1_S2_module(Elaboratable):
         write_counter_rst = (
             (read_counter_rst - processing_delay) % 2**self.order_log2)
         write_counter = Signal(self.order_log2, init=write_counter_rst)
-        sum_counter = Signal(self.nint_width_no_log)
+        sum_counter = Signal(self.nint_width_no_log+1)
         not_first_sum = Signal()
         not_first_sum_delay = Signal(mem_delay)
         pingpong = Signal()

@@ -12,7 +12,8 @@ pub async fn spectrometer_json(state: &AppState) -> Result<Spectrometer> {
     let ip_core = state.ip_core().lock().unwrap();
     let samp_rate = ad9361_samp_rate / ip_core.spectrometer_input_decimation() as f64;
     let input = ip_core.spectrometer_input();
-    let num_integrations = ip_core.spectrometer_number_integrations();
+    let integrations_exp = ip_core.spectrometer_integrations_exp();
+    let num_integrations = 1u32 << integrations_exp;
     let mode = ip_core.spectrometer_mode();
     drop(ip_core);
     state
@@ -22,7 +23,7 @@ pub async fn spectrometer_json(state: &AppState) -> Result<Spectrometer> {
         input,
         input_sampling_frequency: samp_rate,
         output_sampling_frequency: samp_rate / (f64::from(FFT_SIZE) * f64::from(num_integrations)),
-        number_integrations: num_integrations,
+        integrations_exp: integrations_exp,
         fft_size: FFT_SIZE,
         mode,
     })
@@ -59,27 +60,27 @@ async fn update_spectrometer(state: &AppState, patch: &PatchSpectrometer) -> Res
     }
     match patch {
         PatchSpectrometer {
-            number_integrations: Some(n),
+            integrations_exp: Some(n),
             ..
         } => state
             .ip_core()
             .lock()
             .unwrap()
-            .set_spectrometer_number_integrations(*n)
+            .set_spectrometer_integrations_exp(*n)
             .map_err(JsonError::client_error)?,
-        PatchSpectrometer {
-            output_sampling_frequency: Some(out_freq),
-            ..
-        } => {
-            let mut ip_core = state.ip_core().lock().unwrap();
-            let in_freq = ad9361_samp_rate / ip_core.spectrometer_input_decimation() as f64;
-            let num_integrations = (in_freq / (f64::from(FFT_SIZE) * *out_freq))
-                .round()
-                .clamp(1.0, f64::from(u32::MAX)) as u32;
-            ip_core
-                .set_spectrometer_number_integrations(num_integrations)
-                .map_err(JsonError::client_error)?;
-        }
+        // PatchSpectrometer {
+        //     output_sampling_frequency: Some(out_freq),
+        //     ..
+        // } => {
+        //     let mut ip_core = state.ip_core().lock().unwrap();
+        //     let in_freq = ad9361_samp_rate / ip_core.spectrometer_input_decimation() as f64;
+        //     let num_integrations = (in_freq / (f64::from(FFT_SIZE) * *out_freq))
+        //         .round()
+        //         .clamp(1.0, f64::from(u32::MAX)) as u32;
+        //     ip_core
+        //         .set_spectrometer_number_integrations(num_integrations)
+        //         .map_err(JsonError::client_error)?;
+        // }
         _ => {
             // No parameters were specified. We don't do anything.
         }

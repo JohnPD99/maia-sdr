@@ -172,7 +172,7 @@ pub struct Spectrometer {
     /// Output sampling frequency in samples per second.
     pub output_sampling_frequency: f64,
     /// Number of non-coherent integrations.
-    pub number_integrations: u32,
+    pub integrations_exp: u32,
     /// FFT size (read-only).
     pub fft_size: u32,
     /// Spectrometer mode.
@@ -195,7 +195,7 @@ pub struct PatchSpectrometer {
     pub output_sampling_frequency: Option<f64>,
     /// Number of non-coherent integrations.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub number_integrations: Option<u32>,
+    pub integrations_exp: Option<u32>,
     /// Spectrometer mode.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<SpectrometerMode>,

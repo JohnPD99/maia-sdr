@@ -161,8 +161,8 @@
               <access>read-write</access>
             </field>
             <field>
-              <name>num_integrations</name>
-              <description>num_integrations</description>
+              <name>integrations_exp</name>
+              <description>integrations_exp</description>
               <bitRange>[10:1]</bitRange>
               <access>read-write</access>
             </field>

@@ -79,7 +79,7 @@ impl_preference_data! {
     ddc_stopband_attenuation_db: f64 = 60.0,
     ddc_stopband_one_over_f: bool = true,
     spectrometer_input: maia_json::SpectrometerInput = maia_json::SpectrometerInput::AD9361,
-    spectrometer_output_sampling_frequency: f64 = 20.0,
+    spectrometer_integrations_exp: u32 = 4,
     spectrometer_mode: maia_json::SpectrometerMode = maia_json::SpectrometerMode::Average,
     recording_metadata_filename: String = "recording".to_string(),
     recorder_prepend_timestamp: bool = false,

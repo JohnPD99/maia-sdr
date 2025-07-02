@@ -21,7 +21,7 @@ pub struct IpCore {
     // RAM-based cache for the number of spectrometer integrations and
     // mode. These are used to speed up IpCore::spectrometer_number_integrations
     // and IpCore::spectrometer_mode by avoiding to read the FPGA register.
-    spectrometer_integrations: u32,
+    spectrometer_integrations_exp: u32,
     spectrometer_mode: maia_json::SpectrometerMode,
     spectrometer_input: maia_json::SpectrometerInput,
     // RAM-based cache for DDC configuration
@@ -248,7 +248,7 @@ impl IpCore {
             // These are initialized to the correct value below, after removing
             // the SDR reset.
             spectrometer_input: maia_json::SpectrometerInput::AD9361,
-            spectrometer_integrations: 0,
+            spectrometer_integrations_exp: 0,
             spectrometer_mode: maia_json::SpectrometerMode::Average,
             ddc_config: default_ddc_config(),
             ddc_enabled: false,
@@ -257,11 +257,11 @@ impl IpCore {
         ip_core.log_open().await?;
         ip_core.check_product_id()?;
         ip_core.set_sdr_reset(false);
-        ip_core.spectrometer_integrations = ip_core
+        ip_core.spectrometer_integrations_exp = ip_core
             .registers
             .spectrometer()
             .read()
-            .num_integrations()
+            .integrations_exp()
             .bits()
             .into();
         // this also modifies the DDC enable
@@ -378,8 +378,8 @@ impl IpCore {
     /// Note: [`IpCore`] caches in RAM the value of this register every time
     /// that it is updated, so calls to this function are very fast because the
     /// FPGA register doesn't need to be accessed.
-    pub fn spectrometer_number_integrations(&self) -> u32 {
-        self.spectrometer_integrations
+    pub fn spectrometer_integrations_exp(&self) -> u32 {
+        self.spectrometer_integrations_exp
     }
 
     /// Returns the current spectrometer mode.
@@ -429,22 +429,32 @@ impl IpCore {
     /// Sets the value of the number of integrations register of the spectrometer.
     ///
     /// See [`IpCore::spectrometer_number_integrations`].
-    pub fn set_spectrometer_number_integrations(&mut self, value: u32) -> Result<()> {
-        const WIDTH: u8 = maia_pac::maia_sdr::spectrometer::NumIntegrationsW::<
-            maia_pac::maia_sdr::spectrometer::SpectrometerSpec,
-        >::WIDTH;
-        if !(1..1 << WIDTH).contains(&value) {
-            anyhow::bail!("invalid number of integrations: {}", value);
+    pub fn set_spectrometer_integrations_exp(&mut self, value: u32) -> Result<()> {
+        // const WIDTH: u8 = maia_pac::maia_sdr::spectrometer::IntegrationsExpW::<
+        //     maia_pac::maia_sdr::spectrometer::SpectrometerSpec,
+        // >::WIDTH;
+        // if !(1..1 << WIDTH).contains(&value) {
+        //    anyhow::bail!("invalid number of integrations: {}", value);
+        // }
+
+        // Limit the exponent to a maximum of 10
+        const MAX_EXP: u32 = 10;
+
+        if value > MAX_EXP {
+            anyhow::bail!("invalid integrations exponent: {}", value);
         }
+
+
+       
         unsafe {
             self.registers.spectrometer().modify(|r, w| {
                 // if reducing the number of integrations, use the abort bit
                 // to force the current integration to stop
-                let abort = u32::from(r.num_integrations().bits()) > value;
-                w.num_integrations().bits(value as _).abort().bit(abort)
+                let abort = u32::from(r.integrations_exp().bits()) > value;
+                w.integrations_exp().bits(value as _).abort().bit(abort)
             })
         };
-        self.spectrometer_integrations = value;
+        self.spectrometer_integrations_exp = value;
         Ok(())
     }
 
