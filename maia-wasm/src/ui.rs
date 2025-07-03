@@ -20,7 +20,7 @@ use web_sys::{
 use crate::render::RenderEngine;
 use crate::waterfall::Waterfall;
 
-use input::{CheckboxInput, EnumInput, InputElement, NumberInput, NumberSpan, TextInput};
+use input::{CheckboxInput, EnumInput, InputElement, NumberInput, TextInput};
 
 pub mod active;
 pub mod colormap;
@@ -34,8 +34,8 @@ pub mod request;
 
 const API_URL: &str = "/api";
 const AD9361_URL: &str = "/api/ad9361";
-const DDC_CONFIG_URL: &str = "/api/ddc/config";
-const DDC_DESIGN_URL: &str = "/api/ddc/design";
+//const DDC_CONFIG_URL: &str = "/api/ddc/config";
+//const DDC_DESIGN_URL: &str = "/api/ddc/design";
 const GEOLOCATION_URL: &str = "/api/geolocation";
 const RECORDER_URL: &str = "/api/recorder";
 const RECORDING_METADATA_URL: &str = "/api/recording/metadata";
@@ -54,7 +54,7 @@ pub struct Ui {
     api_state: Rc<RefCell<Option<maia_json::Api>>>,
     geolocation: Rc<RefCell<Option<Geolocation>>>,
     geolocation_watch_id: Rc<Cell<Option<i32>>>,
-    local_settings: Rc<RefCell<LocalSettings>>,
+    //local_settings: Rc<RefCell<LocalSettings>>,
     preferences: Rc<RefCell<preferences::Preferences>>,
     render_engine: Rc<RefCell<RenderEngine>>,
     waterfall: Rc<RefCell<Waterfall>>,
@@ -65,7 +65,7 @@ ui_elements! {
     colormap_select: HtmlSelectElement => EnumInput<colormap::Colormap>,
     waterfall_show_waterfall: HtmlInputElement => CheckboxInput,
     waterfall_show_spectrum: HtmlInputElement => CheckboxInput,
-    waterfall_show_ddc: HtmlInputElement => CheckboxInput,
+    //waterfall_show_ddc: HtmlInputElement => CheckboxInput,
     recorder_button: HtmlButtonElement => Rc<HtmlButtonElement>,
     recorder_button_replica: HtmlButtonElement => Rc<HtmlButtonElement>,
     settings_button: HtmlButtonElement => Rc<HtmlButtonElement>,
@@ -75,12 +75,12 @@ ui_elements! {
     settings: HtmlDialogElement => Rc<HtmlDialogElement>,
     close_settings: HtmlButtonElement => Rc<HtmlButtonElement>,
     recording_tab: HtmlButtonElement => Rc<HtmlButtonElement>,
-    ddc_tab: HtmlButtonElement => Rc<HtmlButtonElement>,
+    //ddc_tab: HtmlButtonElement => Rc<HtmlButtonElement>,
     waterfall_tab: HtmlButtonElement => Rc<HtmlButtonElement>,
     geolocation_tab: HtmlButtonElement => Rc<HtmlButtonElement>,
     other_tab: HtmlButtonElement => Rc<HtmlButtonElement>,
     recording_panel: HtmlElement => Rc<HtmlElement>,
-    ddc_panel: HtmlElement => Rc<HtmlElement>,
+    //ddc_panel: HtmlElement => Rc<HtmlElement>,
     waterfall_panel: HtmlElement => Rc<HtmlElement>,
     geolocation_panel: HtmlElement => Rc<HtmlElement>,
     other_panel: HtmlElement => Rc<HtmlElement>,
@@ -94,14 +94,14 @@ ui_elements! {
         => NumberInput<u32, input::MHzPresentation>,
     ad9361_rx_gain_mode: HtmlSelectElement => EnumInput<maia_json::Ad9361GainMode>,
     ad9361_rx_gain: HtmlInputElement => NumberInput<f64>,
-    ddc_frequency: HtmlInputElement => NumberInput<f64, input::KHzPresentation>,
-    ddc_decimation: HtmlInputElement => NumberInput<u32>,
-    ddc_transition_bandwidth: HtmlInputElement => NumberInput<f64>,
-    ddc_passband_ripple: HtmlInputElement => NumberInput<f64>,
-    ddc_stopband_attenuation_db: HtmlInputElement => NumberInput<f64>,
-    ddc_stopband_one_over_f: HtmlInputElement => CheckboxInput,
-    ddc_output_sampling_frequency: HtmlSpanElement => NumberSpan<f64, input::MHzPresentation>,
-    ddc_max_input_sampling_frequency: HtmlSpanElement => NumberSpan<f64, input::MHzPresentation>,
+    //ddc_frequency: HtmlInputElement => NumberInput<f64, input::KHzPresentation>,
+    //ddc_decimation: HtmlInputElement => NumberInput<u32>,
+    //ddc_transition_bandwidth: HtmlInputElement => NumberInput<f64>,
+    //ddc_passband_ripple: HtmlInputElement => NumberInput<f64>,
+    //ddc_stopband_attenuation_db: HtmlInputElement => NumberInput<f64>,
+    //ddc_stopband_one_over_f: HtmlInputElement => CheckboxInput,
+    //ddc_output_sampling_frequency: HtmlSpanElement => NumberSpan<f64, input::MHzPresentation>,
+    //ddc_max_input_sampling_frequency: HtmlSpanElement => NumberSpan<f64, input::MHzPresentation>,
     spectrometer_input: HtmlSelectElement => EnumInput<maia_json::SpectrometerInput>,
     spectrometer_integrations_exp: HtmlInputElement
         => NumberInput<u32, input::IntegerPresentation>,
@@ -125,10 +125,10 @@ ui_elements! {
     maia_wasm_version: HtmlSpanElement => Rc<HtmlSpanElement>,
 }
 
-#[derive(Default)]
-struct LocalSettings {
-    waterfall_show_ddc: bool,
-}
+//#[derive(Default)]
+//struct LocalSettings {
+//    waterfall_show_ddc: bool,
+//}
 
 impl Ui {
     /// Creates a new user interface.
@@ -147,7 +147,7 @@ impl Ui {
             api_state: Rc::new(RefCell::new(None)),
             geolocation: Rc::new(RefCell::new(None)),
             geolocation_watch_id: Rc::new(Cell::new(None)),
-            local_settings: Rc::new(RefCell::new(LocalSettings::default())),
+            //local_settings: Rc::new(RefCell::new(LocalSettings::default())),
             preferences,
             render_engine,
             waterfall,
@@ -174,14 +174,14 @@ impl Ui {
             colormap_select,
             waterfall_show_waterfall,
             waterfall_show_spectrum,
-            waterfall_show_ddc,
+            //waterfall_show_ddc,
             waterfall_min,
             waterfall_max,
             ad9361_rx_lo_frequency,
             ad9361_sampling_frequency,
             ad9361_rx_rf_bandwidth,
             ad9361_rx_gain_mode,
-            ddc_frequency,
+            //ddc_frequency,
             spectrometer_input,
             spectrometer_integrations_exp,
             spectrometer_mode,
@@ -213,7 +213,7 @@ impl Ui {
             geolocation_update,
             geolocation_clear,
             recording_tab,
-            ddc_tab,
+            //ddc_tab,
             waterfall_tab,
             geolocation_tab,
             other_tab
@@ -230,7 +230,7 @@ impl Ui {
         // this closure is here to prevent preferences.apply from calling
         // it multiple times, since the PUT request can be expensive to
         // execute by maia-httpd.
-        let put_ddc_design = self.ddc_put_design_closure().into_js_value();
+       /*  let put_ddc_design = self.ddc_put_design_closure().into_js_value();
         let ddc_onchange = put_ddc_design.unchecked_ref();
         self.elements
             .ddc_decimation
@@ -248,7 +248,7 @@ impl Ui {
             .ddc_stopband_one_over_f
             .set_onchange(Some(ddc_onchange));
         // call the closure now to apply any preferences for the DDC
-        ddc_onchange.call0(&JsValue::NULL)?;
+        ddc_onchange.call0(&JsValue::NULL)?; */
         Ok(())
     }
 }
@@ -285,7 +285,7 @@ impl Ui {
         Closure::new(move || ui.elements.settings.close())
     }
 
-    impl_tabs!(recording, ddc, waterfall, geolocation, other);
+    impl_tabs!(recording, waterfall, geolocation, other);
 }
 
 // API methods
@@ -313,7 +313,7 @@ impl Ui {
         let json = self.get_api().await?;
         self.api_state.replace(Some(json.clone()));
         self.update_ad9361_inactive_elements(&json.ad9361)?;
-        self.update_ddc_inactive_elements(&json.ddc)?;
+        //self.update_ddc_inactive_elements(&json.ddc)?;
         self.update_spectrometer_inactive_elements(&json.spectrometer)?;
         self.update_waterfall_rate(&json.spectrometer);
         self.update_recorder_button(&json.recorder);
@@ -365,7 +365,7 @@ impl Ui {
             } else {
                 ad9361_freq = None;
             }
-            self.set_ddc_frequency(ddc_freq)?;
+            //self.set_ddc_frequency(ddc_freq)?;
         }
         if let Some(freq) = ad9361_freq {
             // Change the AD9361 frequency
@@ -442,7 +442,7 @@ impl Ui {
 }
 
 // DDC methods
-impl Ui {
+/* impl Ui {
     impl_update_elements!(
         ddc,
         maia_json::DDCConfigSummary,
@@ -564,7 +564,7 @@ impl Ui {
             .call0(&JsValue::NULL)?;
         Ok(())
     }
-}
+} */
 
 // Geolocation methods
 
@@ -1048,8 +1048,8 @@ impl Ui {
         waterfall_min,
         waterfall_max,
         waterfall_show_waterfall,
-        waterfall_show_spectrum,
-        waterfall_show_ddc
+        waterfall_show_spectrum
+        //waterfall_show_ddc
     );
 
     fn colormap_select_apply(&self, value: colormap::Colormap) {
@@ -1076,7 +1076,7 @@ impl Ui {
         self.waterfall.borrow_mut().set_spectrum_visible(value);
     }
 
-    fn waterfall_show_ddc_apply(&self, value: bool) {
+    /* fn waterfall_show_ddc_apply(&self, value: bool) {
         self.local_settings.borrow_mut().waterfall_show_ddc = value;
         let state = self.api_state.borrow();
         let Some(state) = state.as_ref() else {
@@ -1089,17 +1089,17 @@ impl Ui {
         self.waterfall
             .borrow_mut()
             .set_channel_visible(value && !input_is_ddc);
-    }
+    } */
 
     fn update_waterfall_ad9361(&self, json: &maia_json::Ad9361) -> Result<(), JsValue> {
         // updates only the frequency
         let mut waterfall = self.waterfall.borrow_mut();
         let samp_rate = waterfall.get_freq_samprate().1;
-        let freq = json.rx_lo_frequency as f64 + self.waterfall_ddc_tuning();
+        let freq = json.rx_lo_frequency as f64;
         waterfall.set_freq_samprate(freq, samp_rate, &mut self.render_engine.borrow_mut())
     }
 
-    fn waterfall_ddc_tuning(&self) -> f64 {
+   /*  fn waterfall_ddc_tuning(&self) -> f64 {
         let state = self.api_state.borrow();
         let Some(state) = state.as_ref() else {
             return 0.0;
@@ -1108,9 +1108,9 @@ impl Ui {
             return 0.0;
         }
         state.ddc.frequency
-    }
+    } */
 
-    fn update_waterfall_ddc(&self, json: &maia_json::DDCConfigSummary) -> Result<(), JsValue> {
+    /* fn update_waterfall_ddc(&self, json: &maia_json::DDCConfigSummary) -> Result<(), JsValue> {
         // updates the center frequency and channel frequency
         let mut waterfall = self.waterfall.borrow_mut();
         let state = self.api_state.borrow();
@@ -1130,7 +1130,7 @@ impl Ui {
         waterfall.set_channel_frequency(json.frequency);
         waterfall.set_channel_decimation(json.decimation);
         Ok(())
-    }
+    } */
 
     fn update_waterfall_spectrometer(&self, json: &maia_json::Spectrometer) -> Result<(), JsValue> {
         let mut waterfall = self.waterfall.borrow_mut();
@@ -1138,21 +1138,21 @@ impl Ui {
         let Some(state) = state.as_ref() else {
             return Err("update_waterfall_spectrometer: api_state not available yet".into());
         };
-        let input_is_ddc = matches!(json.input, maia_json::SpectrometerInput::DDC);
+        /* let input_is_ddc = matches!(json.input, maia_json::SpectrometerInput::DDC);
         let ddc_tuning = if input_is_ddc {
             state.ddc.frequency
         } else {
-            0.0
-        };
-        let freq = state.ad9361.rx_lo_frequency as f64 + ddc_tuning;
+            0.0W
+        }; */
+        let freq = state.ad9361.rx_lo_frequency as f64;
         waterfall.set_freq_samprate(
             freq,
             json.input_sampling_frequency,
             &mut self.render_engine.borrow_mut(),
         )?;
-        let show_ddc = self.local_settings.borrow().waterfall_show_ddc;
-        waterfall.set_channel_visible(show_ddc && !input_is_ddc);
-        waterfall.set_channel_frequency(state.ddc.frequency);
+        /* let show_ddc = self.local_settings.borrow().waterfall_show_ddc;
+        waterfall.set_channel_visible(show_ddc && !input_is_ddc); */
+        //waterfall.set_channel_frequency(state.ddc.frequency);
         Ok(())
     }
 
@@ -1164,10 +1164,7 @@ impl Ui {
             return;
         };
 
-        let input_sampling_frequency = match json.input {
-            maia_json::SpectrometerInput::AD9361 => state.ad9361.sampling_frequency as f32,
-            maia_json::SpectrometerInput::DDC => state.ddc.output_sampling_frequency as f32,
-        };
+        let input_sampling_frequency = state.ad9361.sampling_frequency as f32;
 
         // FFT length is fixed — confirm from your setup (e.g. 1024 or 2048)
         const FFT_LEN: f32 = 4096.0;

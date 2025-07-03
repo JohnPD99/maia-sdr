@@ -50,7 +50,7 @@ struct Enables {
     spectrum: Rc<Cell<bool>>,
     frequency_labels: Rc<Cell<bool>>,
     frequency_ticks: Rc<Cell<bool>>,
-    channel: Rc<Cell<bool>>,
+    //channel: Rc<Cell<bool>>,
 }
 
 struct Uniforms {
@@ -66,8 +66,8 @@ struct Uniforms {
     freq_labels_width: Rc<Uniform<f32>>,
     freq_labels_height: Rc<Uniform<f32>>,
     major_ticks_end: Rc<Uniform<i32>>,
-    channel_freq: Rc<Uniform<f32>>,
-    channel_width: Rc<Uniform<f32>>,
+    //channel_freq: Rc<Uniform<f32>>,
+    //channel_width: Rc<Uniform<f32>>,
 }
 
 struct Textures {
@@ -154,8 +154,8 @@ impl Waterfall {
         engine.add_object(horizontal_divisions_object);
         let spectrum_object = w.spectrum_object(engine)?;
         engine.add_object(spectrum_object);
-        let channel_object = w.channel_object(engine)?;
-        engine.add_object(channel_object);
+      /*   let channel_object = w.channel_object(engine)?;
+        engine.add_object(channel_object); */
         let (frequency_labels_object, frequency_ticks_object) =
             w.frequency_labels_object(engine)?;
         engine.add_object(frequency_labels_object);
@@ -352,24 +352,24 @@ impl Waterfall {
     }
 
     /// Returns whether the DDC channel is visible in the waterfall.
-    pub fn is_channel_visible(&self) -> bool {
+   /*  pub fn is_channel_visible(&self) -> bool {
         self.enables.channel.get()
-    }
+    } */
 
     /// Sets whether the DDC channel is visible in the waterfall.
     ///
     /// By default the channel is not visible.
-    pub fn set_channel_visible(&self, visible: bool) {
+    /* pub fn set_channel_visible(&self, visible: bool) {
         self.enables.channel.set(visible);
-    }
+    } */
 
     /// Returns the frequency of the DDC channel in the waterfall.
     ///
     /// The frequency is given in Hz of offset with respect to the waterfall
     /// center frequency.
-    pub fn get_channel_frequency(&self) -> f64 {
+   /*  pub fn get_channel_frequency(&self) -> f64 {
         0.5 * self.uniforms.channel_freq.get_data() as f64 * self.samp_rate
-    }
+    } */
 
     /// Sets the frequency of the DDC channel in the waterfall.
     ///
@@ -379,20 +379,20 @@ impl Waterfall {
     ///
     /// This funciton must also be called when the sample rate is changed using
     /// `[Self::set_freq_samprate]`.
-    pub fn set_channel_frequency(&mut self, frequency: f64) {
+   /*  pub fn set_channel_frequency(&mut self, frequency: f64) {
         // The range for frequency is [-1, 1], so we need to multiply by 2.
         let frequency = 2.0 * frequency / self.samp_rate;
         self.uniforms.channel_freq.set_data(frequency as f32);
-    }
+    } */
 
     /// Sets the decimation factor of the DDC channel in the waterfall.
     ///
     /// This function shall be called when the DDC decimation factor changes.
-    pub fn set_channel_decimation(&mut self, decimation: u32) {
+    /* pub fn set_channel_decimation(&mut self, decimation: u32) {
         self.uniforms
             .channel_width
             .set_data(f64::from(decimation).recip() as f32);
-    }
+    } */
 
     fn waterfall_object(&self, engine: &mut RenderEngine) -> Result<RenderObject, JsValue> {
         let program = Self::waterfall_program(engine)?;
@@ -489,7 +489,7 @@ impl Waterfall {
         })
     }
 
-    fn channel_object(&self, engine: &mut RenderEngine) -> Result<RenderObject, JsValue> {
+    /* fn channel_object(&self, engine: &mut RenderEngine) -> Result<RenderObject, JsValue> {
         let program = Self::channel_program(engine)?;
         let vao = self.rectangle_vao(engine, &program)?;
         Ok(RenderObject {
@@ -502,7 +502,7 @@ impl Waterfall {
             uniforms: self.uniforms.channel_uniforms(),
             textures: Box::new([]),
         })
-    }
+    } */
 
     fn waterfall_program(engine: &RenderEngine) -> Result<Rc<WebGlProgram>, JsValue> {
         let source = ProgramSource {
@@ -696,7 +696,7 @@ impl Waterfall {
         engine.make_program(source)
     }
 
-    fn channel_program(engine: &RenderEngine) -> Result<Rc<WebGlProgram>, JsValue> {
+   /*  fn channel_program(engine: &RenderEngine) -> Result<Rc<WebGlProgram>, JsValue> {
         let source = ProgramSource {
             vertex_shader: r#"#version 300 es
         in vec2 aPosition;
@@ -718,7 +718,7 @@ impl Waterfall {
         };
 
         engine.make_program(source)
-    }
+    } */
 
     fn waterfall_vao(
         &self,
@@ -1091,15 +1091,15 @@ impl Waterfall {
 
     /// Returns the value of the uniform associated with the DDC channel
     /// frequency.
-    pub fn get_channel_frequency_uniform(&self) -> f32 {
+    /* pub fn get_channel_frequency_uniform(&self) -> f32 {
         self.uniforms.channel_freq.get_data()
-    }
+    } */
 
     /// Returns the value of the uniform associated with the DDC channel
     /// width.
-    pub fn get_channel_width_uniform(&self) -> f32 {
+  /*   pub fn get_channel_width_uniform(&self) -> f32 {
         self.uniforms.channel_width.get_data()
-    }
+    } */
 
     fn update_waterfall_scale(&mut self) {
         let waterfall_scale_add = -self.waterfall_min * 0.1;
@@ -1219,8 +1219,8 @@ impl Uniforms {
                 String::from("uMajorTicksEnd"),
                 Default::default(),
             )),
-            channel_freq: Rc::new(Uniform::new(String::from("uChannelFreq"), 0.0)),
-            channel_width: Rc::new(Uniform::new(String::from("uChannelWidth"), 0.1)),
+            /* channel_freq: Rc::new(Uniform::new(String::from("uChannelFreq"), 0.0)),
+            channel_width: Rc::new(Uniform::new(String::from("uChannelWidth"), 0.1)), */
         }
     }
 
@@ -1272,14 +1272,14 @@ impl Uniforms {
         ])
     }
 
-    fn channel_uniforms(&self) -> Box<[Rc<dyn UniformValue>]> {
+   /*  fn channel_uniforms(&self) -> Box<[Rc<dyn UniformValue>]> {
         Box::new([
             Rc::clone(&self.center_freq) as _,
             Rc::clone(&self.zoom) as _,
             Rc::clone(&self.channel_freq) as _,
             Rc::clone(&self.channel_width) as _,
         ])
-    }
+    } */
 }
 
 impl Default for Uniforms {

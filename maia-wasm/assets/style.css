@@ -261,17 +261,11 @@ input.baseband_frequency {
     width: 5.5em;
 }
 
-input.baseband_frequency_khz {
-    width: 7em;
-}
 
 input.gain {
     width: 3.5em;
 }
 
-input.decimation {
-    width: 4.25em;
-}
 
 #spectrometer_integrations_exp {
     width: 5em;

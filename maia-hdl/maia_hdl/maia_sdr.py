@@ -537,7 +537,7 @@ class TRTSDR(Elaboratable):
                         Field('integrations_exp',
                               Access.RW,
                               self.spectrometer.nint_width*2,
-                              -1),
+                              5),
                         Field('abort', Access.Wpulse, 1, 0),
                         Field('last_buffer',
                               Access.R,

@@ -28,9 +28,9 @@
           <button id="recording_tab" role="tab" aria-selected="true" aria-controls="recording_panel">
             Recording
           </button>
-          <button id="ddc_tab" role="tab" aria-selected="false" aria-controls="ddc_panel">
+          <!-- <button id="ddc_tab" role="tab" aria-selected="false" aria-controls="ddc_panel">
             DDC
-          </button>
+          </button> -->
           <button id="waterfall_tab" role="tab" aria-selected="false" aria-controls="waterfall_panel">
             Waterfall
           </button>
@@ -73,7 +73,7 @@
             <a id="download_recording" class="link_button" href="/recording" download>Download recording</a>
           </form>
         </div>
-        <div id="ddc_panel" class="hidden" role="tabpanel" aria-labelledby="ddc_tab">
+       <!--  <div id="ddc_panel" class="hidden" role="tabpanel" aria-labelledby="ddc_tab">
           <form>
             <label for="ddc_transition_bandwidth">Transition bandwidth</label>
             <input type="number" id="ddc_transition_bandwidth" value="0.05" step="any" min="0" max="1">
@@ -89,7 +89,7 @@
             <div class="div_label">Max input sampling freq</div>
             <div class="div_value"><span id="ddc_max_input_sampling_frequency"></span> MHz</div>
           </form>
-        </div>
+        </div> -->
         <div id="waterfall_panel" class="hidden" role="tabpanel" aria-labelledby="waterfall_tab">
           <form>
             <label for="colormap_select">Colormap</label>
@@ -102,8 +102,8 @@
             <input type="checkbox" id="waterfall_show_waterfall" checked>
             <label for="waterfall_show_spectrum">Show spectrum</label>
             <input type="checkbox" id="waterfall_show_spectrum">
-            <label for="waterfall_show_ddc">Show DDC passband</label>
-            <input type="checkbox" id="waterfall_show_ddc" checked>
+         <!--    <label for="waterfall_show_ddc">Show DDC passband</label>
+            <input type="checkbox" id="waterfall_show_ddc" checked> -->
           </form>
         </div>
         <div id="geolocation_panel" class="hidden" role="tabpanel" aria-labelledby="geolocation_tab">
@@ -174,14 +174,14 @@
             <option>DDC</option>
           </select>
         </label>
-        <label>DDC freq
+       <!--  <label>DDC freq
           <input type="number" class="baseband_frequency_khz" id="ddc_frequency" step="0.001">
           kHz
-        </label>
-        <label>Decimation
+        </label> -->
+      <!--   <label>Decimation
           <input type="number" class="decimation" value="20" id="ddc_decimation" step="1" min="2">
         </label>
-        <label>DDC output <span id="ddc_output_sampling_frequency"></span> Msps</label>
+        <label>DDC output <span id="ddc_output_sampling_frequency"></span> Msps</label> -->
         <button type="button" id="recorder_button" class="record_button"></button>
         <button type="button" id="settings_button">Settings</button>
       </form>

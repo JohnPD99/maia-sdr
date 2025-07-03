@@ -64,7 +64,7 @@ impl_preference_data! {
     colormap_select: super::colormap::Colormap = super::colormap::Colormap::Turbo,
     waterfall_show_waterfall: bool = true,
     waterfall_show_spectrum: bool = false,
-    waterfall_show_ddc: bool = true,
+    //waterfall_show_ddc: bool = true,
     waterfall_min: f32 = 35.0,
     waterfall_max: f32 = 85.0,
     ad9361_rx_lo_frequency: u64 = 2_400_000_000,
@@ -72,12 +72,12 @@ impl_preference_data! {
     ad9361_rx_rf_bandwidth: u32 = 56_000_000,
     ad9361_rx_gain_mode: maia_json::Ad9361GainMode = maia_json::Ad9361GainMode::SlowAttack,
     ad9361_rx_gain: f64 = 70.0,
-    ddc_frequency: f64 = 0.0,
+   /*  ddc_frequency: f64 = 0.0,
     ddc_decimation: u32 = 20,
     ddc_transition_bandwidth: f64 = 0.05,
     ddc_passband_ripple: f64 = 0.01,
     ddc_stopband_attenuation_db: f64 = 60.0,
-    ddc_stopband_one_over_f: bool = true,
+    ddc_stopband_one_over_f: bool = true, */
     spectrometer_input: maia_json::SpectrometerInput = maia_json::SpectrometerInput::AD9361,
     spectrometer_integrations_exp: u32 = 4,
     spectrometer_mode: maia_json::SpectrometerMode = maia_json::SpectrometerMode::Average,
@@ -160,7 +160,8 @@ macro_rules! impl_dummy_preferences {
     }
 }
 
-impl_dummy_preferences!(
+/* impl_dummy_preferences!(
     ddc_output_sampling_frequency: f64,
     ddc_max_input_sampling_frequency: f64,
 );
+ */

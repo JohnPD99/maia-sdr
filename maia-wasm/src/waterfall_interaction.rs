@@ -36,15 +36,14 @@ pub struct WaterfallInteraction {
 #[derive(Copy, Clone)]
 struct Drag {
     series_id: u8,
-    object: DragObject,
+    //object: DragObject,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+/* #[derive(Copy, Clone, PartialEq, Eq)]
 enum DragObject {
     Waterfall,
-    Channel,
 }
-
+ */
 impl WaterfallInteraction {
     /// Creates a waterfall interaction controller.
     ///
@@ -228,7 +227,7 @@ impl WaterfallInteraction {
     fn process_gesture(&self, gesture: PointerGesture) -> Result<(), JsValue> {
         match gesture {
             PointerGesture::Drag {
-                dx, x0, series_id, ..
+                dx, series_id, ..
             } => {
                 let mut waterfall = self.waterfall.borrow_mut();
                 let units_per_px = Self::units_per_px(&self.render_engine.borrow(), &waterfall);
@@ -240,33 +239,12 @@ impl WaterfallInteraction {
                     .map(|drag| drag.series_id != series_id)
                     .unwrap_or(true);
                 if new_drag {
-                    let object = if !waterfall.is_channel_visible() {
-                        DragObject::Waterfall
-                    } else {
-                        // x0 uses client coordinates so we need to shift it according
-                        // to the client coordinates for the canvas origin.
-                        let x0 = x0 - self.canvas.get_bounding_client_rect().x().round() as i32;
-                        let freq = waterfall.get_center_frequency();
-                        let f0 = freq + x0 as f32 * units_per_px - 1.0 / waterfall.get_zoom();
-                        let chan_freq = waterfall.get_channel_frequency_uniform();
-                        let chan_width = waterfall.get_channel_width_uniform();
-                        let inside_channel = (f0 - chan_freq).abs() <= chan_width;
-                        if inside_channel {
-                            DragObject::Channel
-                        } else {
-                            DragObject::Waterfall
-                        }
-                    };
-                    self.drag_series.set(Some(Drag { series_id, object }));
+                    //let object = DragObject::Waterfall;
+                    self.drag_series.set(Some(Drag { series_id }));
                 }
 
-                let object = self.drag_series.get().unwrap().object;
-                match object {
-                    DragObject::Channel => self.drag_channel(&mut waterfall, dx, units_per_px)?,
-                    DragObject::Waterfall => {
-                        self.drag_waterfall(&mut waterfall, dx, units_per_px)?
-                    }
-                }
+                //let object = self.drag_series.get().unwrap().object;
+                self.drag_waterfall(&mut waterfall, dx, units_per_px)?
             }
             PointerGesture::Pinch {
                 center, dilation, ..
@@ -278,23 +256,6 @@ impl WaterfallInteraction {
                 center.0,
             ),
         }
-        Ok(())
-    }
-
-    fn drag_channel(
-        &self,
-        waterfall: &mut Waterfall,
-        dx: i32,
-        units_per_px: f32,
-    ) -> Result<(), JsValue> {
-        let ui = self.ui.borrow();
-        let ui = ui.as_ref().unwrap();
-        let samp_rate = waterfall.get_freq_samprate().1;
-        let freq = waterfall.get_channel_frequency()
-            + f64::from(dx) * f64::from(units_per_px) * 0.5 * samp_rate;
-        let freq = freq.clamp(-0.5 * samp_rate, 0.5 * samp_rate);
-        waterfall.set_channel_frequency(freq);
-        ui.set_ddc_frequency(freq)?;
         Ok(())
     }
 
