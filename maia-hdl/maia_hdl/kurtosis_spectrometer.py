@@ -68,6 +68,7 @@ class Kurthosis_Spectrometer(Elaboratable):
         self.fft_order_log2 = 12
         self.width_in = 16
         self.nint_width = 5
+        self.kurtwidth = 5
 
         self.dma = DmaBRAMWrite(
             dma_base_address, dma_buffers_log2,
@@ -84,6 +85,8 @@ class Kurthosis_Spectrometer(Elaboratable):
         self.last_buffer = Signal(dma_buffers_log2)
 
         self.interrupt_out = Signal()
+        self.kurt1 = Signal(self.kurtwidth)
+        self.kurt2 = Signal(self.kurtwidth)
 
     def ports(self):
         return self.dma.axi.ports() + [
@@ -95,6 +98,8 @@ class Kurthosis_Spectrometer(Elaboratable):
             self.abort,
             self.last_buffer,
             self.interrupt_out,
+            self.kurt1,
+            self.kurt2
         ]
 
     def elaborate(self, platform):
@@ -113,7 +118,7 @@ class Kurthosis_Spectrometer(Elaboratable):
         spectrum_fp_width = 18
         m.submodules.integrator = integrator = S1_S2_module(
             self._domain_3x, width_fft_out, spectrum_fp_width,
-            self.nint_width, self.fft_order_log2)
+            self.nint_width, self.fft_order_log2, self.kurtwidth)
         # Form 64-bit rdata for the DMA. The exponent is placed in the 8 MSBs
         # and the value is placed in the LSBs, leaving a gap with zeros between
         # them
@@ -146,6 +151,9 @@ class Kurthosis_Spectrometer(Elaboratable):
             integrator.im_in.eq(fft.im_out),
             integrator.rdaddr.eq(dma.raddr),
             integrator.rden.eq(dma.ren),
+            integrator.kurt1.eq(self.kurt1),
+            integrator.kurt2.eq(self.kurt2),
+
 
             dma.rdata.eq(dma_rdata),
             dma.start.eq(integrator.done),

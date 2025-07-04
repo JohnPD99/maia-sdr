@@ -43,14 +43,14 @@ pub async fn ad9361_json(iio: &iio::Ad9361) -> Result<Ad9361> {
 }
 
 async fn ad9361_update(
-    state: &AppState,
+    //state: &AppState,
     iio: &iio::Ad9361,
     json: &PatchAd9361,
 ) -> Result<(), JsonError> {
     if let Some(freq) = json.sampling_frequency {
         // here the input sample rate to the DDC does not matter, because we only
         // need its config to check the maximum input sampling frequency and the enable
-        let ddc_config = state.ip_core().lock().unwrap().ddc_config_summary(0.0);
+        /* let ddc_config = state.ip_core().lock().unwrap().ddc_config_summary(0.0);
         // check that DDC can support this input frequency if it is enabled
         if ddc_config.enabled && f64::from(freq) > ddc_config.max_input_sampling_frequency {
             return Err(JsonError::client_error_alert(anyhow::anyhow!(
@@ -58,18 +58,18 @@ async fn ad9361_update(
                            but DDC is enabled and its maximum input sampling frequency is {}",
                 ddc_config.max_input_sampling_frequency
             )));
-        }
+        } */
         iio.set_sampling_frequency(freq)
             .await
             .map_err(JsonError::server_error)?;
 
         // maintain the DDC frequency after the sample rate change
-        state
+        /* state
             .ip_core()
             .lock()
             .unwrap()
             .set_ddc_frequency(ddc_config.frequency, f64::from(freq))
-            .map_err(JsonError::client_error_alert)?;
+            .map_err(JsonError::client_error_alert)?; */
     }
     try_set_attributes!(
         iio,
@@ -103,7 +103,7 @@ async fn patch_ad9361_json(
     patch: &PatchAd9361,
 ) -> Result<Json<Ad9361>, JsonError> {
     let iio = state.ad9361().lock().await;
-    ad9361_update(&state, &iio, patch).await?;
+    ad9361_update(&iio, patch).await?;
     get_ad9361_json(&iio).await
 }
 

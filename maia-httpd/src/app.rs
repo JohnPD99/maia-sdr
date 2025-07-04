@@ -43,11 +43,8 @@ impl App {
             recorder,
             spectrometer_config: Default::default(),
         }));
-        // Initialize spectrometer sample rate and mode
-        state.spectrometer_config().set_samp_rate_mode(
-            state.ad9361().lock().await.get_sampling_frequency().await? as f32,
-            state.ip_core().lock().unwrap().spectrometer_mode(),
-        );
+        // Initialize spectrometer sample rate
+        state.spectrometer_config().set_samp_rate(state.ad9361().lock().await.get_sampling_frequency().await? as f32);
 
         // Build application objects
 

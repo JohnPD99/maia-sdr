@@ -87,7 +87,7 @@ class S1_S2_module(Elaboratable):
         Read enable for the BRAM that contains the previous integration.
     """
     def __init__(self, domain_3x, input_width, input_fp_width,
-                 nint_width, fft_order_log2):
+                 nint_width, fft_order_log2, kurtwidth):
         self.w = input_width
         self.fw = input_fp_width
         self.nw = nint_width
@@ -96,7 +96,7 @@ class S1_S2_module(Elaboratable):
         self.sumw = 2*self.fw + 1 + self.nint_width_no_log
         self.sumw2 = 4*self.fw -1  + self.nint_width_no_log
 
-        self.kurt_width = 5
+        self.kurt_width = kurtwidth
         self.maxexponent = 4
 
         self.order_log2 = fft_order_log2
@@ -134,13 +134,16 @@ class S1_S2_module(Elaboratable):
         self.rdata_exponent = Signal(self.ew)
         self.rden = Signal()
 
+        self.kurt1 = Signal(self.kurt_width, reset_less=True)
+        self.kurt2 = Signal(self.kurt_width, reset_less=True)
+
         self.test = Signal()
 
     @property
     def model_vlen(self, log2_nint):
         return 2**self.order_log2 * (2**log2_nint)
 
-    def model(self, log2_nint, re_in, im_in):
+    def model(self, log2_nint, re_in, im_in, kurt1, kurt2):
         re_in, im_in = (
             np.array(x, dtype=object).reshape(-1, 2**log2_nint, 2**self.order_log2)
             for x in [re_in, im_in]
@@ -181,7 +184,7 @@ class S1_S2_module(Elaboratable):
             for bin in range(2**self.order_log2):
                 acc[batch, bin] = self.kurtosis_module.model(acc[batch, bin], acc2[batch, bin],
                                                              acc_exp[batch,bin], acc2_exp[batch,bin],
-                                                             log2_nint, 1, 3, 1)
+                                                             log2_nint, kurt1, kurt2, 1)
        
         # Bit reverse accumulator order
         acc = acc[:, [bit_invert(n, self.order_log2, 1)
@@ -386,10 +389,10 @@ class S1_S2_module(Elaboratable):
             kurtosis_module.exp_cpwr2_in.eq(exp2_delay[-1]),
             
             kurtosis_module.log2_nint.eq(self.log2_nint),
-            kurtosis_module.kurt_shift_1.eq(1),
-            kurtosis_module.kurt_shift_2.eq(3),
+            kurtosis_module.kurt_shift_1.eq(self.kurt1),
+            kurtosis_module.kurt_shift_2.eq(self.kurt2),
             
-            kurtosis_module.last_int.eq(last_fft_delay[-1]), #usually set to delay_last_int[-1]
+            kurtosis_module.last_int.eq(last_fft_delay[-1]),
 
 
 
@@ -432,5 +435,5 @@ if __name__ == '__main__':
             integrator.common_edge,
             integrator.input_last, integrator.re_in, integrator.im_in,
             integrator.done, integrator.rdaddr, integrator.rdata_value,
-            integrator.rdata_exponent, integrator.rden],
+            integrator.rdata_exponent, integrator.rden, integrator.kurt1, integrator.kurt2],
         platform=PlutoPlatform())

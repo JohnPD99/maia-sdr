@@ -23,6 +23,7 @@ class TestSpectrumIntegrator(AmaranthSim):
         self.fp_width = 18
         self.nint_width = 5
         self.read_delay = 2  # we are using a BRAM output register
+        self.kurtwidth = 5
         self.domain_3x = 'clk3x'
 
     def test_model(self):
@@ -36,7 +37,7 @@ class TestSpectrumIntegrator(AmaranthSim):
     def common_model(self, log2_integrations):
         self.dut0 = S1_S2_module(
             self.domain_3x, self.width, self.fp_width, self.nint_width,
-            self.fft_order_log2)
+            self.fft_order_log2, self.kurtwidth)
         self.dut = CommonEdgeTb(
             self.dut0, [(self.domain_3x, 3, 'common_edge')])
 
@@ -50,6 +51,8 @@ class TestSpectrumIntegrator(AmaranthSim):
         )
         async def set_inputs(ctx):
             ctx.set(self.dut0.log2_nint, log2_integrations)
+            ctx.set(self.dut0.kurt1, 1)
+            ctx.set(self.dut0.kurt2, 3)
             for j, x in enumerate(zip(re_in, im_in)):
                 await ctx.tick()
                 re = x[0]
@@ -60,10 +63,6 @@ class TestSpectrumIntegrator(AmaranthSim):
                         j % self.nfft == self.nfft - 1)
                 ctx.set(self.dut0.clken, 1)
                 await ctx.tick()
-                # if j < 10:
-                #     print(f'val: {ctx.get(self.dut0.test)}, @cycle {j}')
-                # if j > len(re_in)-260:
-                #     print(f'val: {ctx.get(self.dut0.test)}, @cycle {j}')
                 ctx.set(self.dut0.clken, 0)
 
         async def check_ram_contents(ctx):
@@ -101,14 +100,14 @@ class TestSpectrumIntegrator(AmaranthSim):
                     (n * (2**log2_integrations) + 1) * self.nfft,
                     ((n + 1) * (2**log2_integrations) + 1) * self.nfft)
                 expected = self.dut0.model(
-                    log2_integrations, re_in[sel], im_in[sel])
+                    log2_integrations, re_in[sel], im_in[sel], 1, 3)
                 print(expected)
                 await check_ram(*expected)
 
         self.simulate([set_inputs, check_ram_contents],
                       named_clocks={self.domain_3x: 4e-9})
 
-    def test_constant_input(self):
+    """ def test_constant_input(self):
         pass
         #with self.subTest():
         #    self.common_constant_input()
@@ -171,7 +170,7 @@ class TestSpectrumIntegrator(AmaranthSim):
 
         self.simulate([set_inputs, check_ram_contents],
                       named_clocks={self.domain_3x: 4e-9}),
-
+ """
 
 if __name__ == '__main__':
     unittest.main()

@@ -7,7 +7,7 @@ use crate::app::AppState;
 use anyhow::Result;
 use axum::{
     Router,
-    routing::{get, put},
+    routing::{get},
 };
 use axum_server::tls_rustls::RustlsConfig;
 use bytes::Bytes;
@@ -20,7 +20,7 @@ use tower_http::{
 
 mod ad9361;
 mod api;
-mod ddc;
+//mod ddc;
 mod geolocation;
 mod iqengine;
 mod recording;
@@ -81,13 +81,6 @@ impl Server {
                 "/api/spectrometer",
                 get(spectrometer::get_spectrometer).patch(spectrometer::patch_spectrometer),
             )
-            .route(
-                "/api/ddc/config",
-                get(ddc::get_ddc_config)
-                    .put(ddc::put_ddc_config)
-                    .patch(ddc::patch_ddc_config),
-            )
-            .route("/api/ddc/design", put(ddc::put_ddc_design))
             .route(
                 "/api/geolocation",
                 get(geolocation::get_geolocation).put(geolocation::put_geolocation),

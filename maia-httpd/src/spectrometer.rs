@@ -6,7 +6,6 @@
 use crate::{app::AppState, fpga::InterruptWaiter};
 use anyhow::Result;
 use bytes::Bytes;
-use maia_json::SpectrometerMode;
 use std::sync::Mutex;
 use tokio::sync::broadcast;
 
@@ -35,8 +34,7 @@ pub struct SpectrometerConfig(Mutex<Config>);
 
 #[derive(Debug, Clone)]
 struct Config {
-    samp_rate: f32,
-    mode: SpectrometerMode,
+    samp_rate: f32
 }
 
 impl Spectrometer {
@@ -66,14 +64,11 @@ impl Spectrometer {
     pub async fn run(self) -> Result<()> {
         loop {
             self.interrupt.wait().await;
-            let (samp_rate, mode) = self.state.spectrometer_config().samp_rate_mode();
+            let samp_rate = self.state.spectrometer_config().samp_rate();
             let mut ip_core = self.state.ip_core().lock().unwrap();
             let integrations_exp = ip_core.spectrometer_integrations_exp() as u32;
             let num_integrations = (1u32 << integrations_exp) as f32; 
-            let scale = match mode {
-                SpectrometerMode::Average => BASE_SCALE / (num_integrations * samp_rate),
-                SpectrometerMode::PeakDetect => BASE_SCALE / samp_rate,
-            };
+            let scale = BASE_SCALE / (num_integrations * samp_rate);
             tracing::trace!(
                 last_buffer = ip_core.spectrometer_last_buffer(),
                 samp_rate,
@@ -117,8 +112,7 @@ impl SpectrometerConfig {
     /// Creates a new spectrometer configuration object.
     fn new() -> SpectrometerConfig {
         SpectrometerConfig(Mutex::new(Config {
-            samp_rate: 0.0,
-            mode: SpectrometerMode::Average,
+            samp_rate: 0.0
         }))
     }
 
@@ -129,35 +123,12 @@ impl SpectrometerConfig {
         self.0.lock().unwrap().samp_rate
     }
 
-    /// Returns the spectrometer mode.
-    pub fn mode(&self) -> SpectrometerMode {
-        self.0.lock().unwrap().mode
-    }
-
-    /// Returns the spectrometer sample rate and mode
-    pub fn samp_rate_mode(&self) -> (f32, SpectrometerMode) {
-        let conf = self.0.lock().unwrap();
-        (conf.samp_rate, conf.mode)
-    }
-
     /// Sets the spectrometer sample rate.
     ///
     /// Updates the spectrometer sample rate to the value give, in units of
     /// samples per second.
     pub fn set_samp_rate(&self, samp_rate: f32) {
         self.0.lock().unwrap().samp_rate = samp_rate;
-    }
-
-    /// Sets the spectrometer mode.
-    pub fn set_mode(&self, mode: SpectrometerMode) {
-        self.0.lock().unwrap().mode = mode;
-    }
-
-    /// Sets the spectrometer sample rate and mode.
-    pub fn set_samp_rate_mode(&self, samp_rate: f32, mode: SpectrometerMode) {
-        let mut conf = self.0.lock().unwrap();
-        conf.samp_rate = samp_rate;
-        conf.mode = mode;
     }
 }
 

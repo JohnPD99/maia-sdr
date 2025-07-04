@@ -8,7 +8,7 @@
 
 pub mod app;
 pub mod args;
-pub mod ddc;
+//pub mod ddc;
 pub mod fpga;
 pub mod httpd;
 pub mod iio;

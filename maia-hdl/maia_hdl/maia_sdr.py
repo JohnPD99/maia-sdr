@@ -530,10 +530,6 @@ class TRTSDR(Elaboratable):
                 0b000: Register(
                     'spectrometer',
                     [
-                        Field('use_ddc_out',
-                              Access.RW,
-                              1,
-                              0),
                         Field('integrations_exp',
                               Access.RW,
                               self.spectrometer.nint_width*2,
@@ -543,92 +539,17 @@ class TRTSDR(Elaboratable):
                               Access.R,
                               len(self.spectrometer.last_buffer),
                               0),
-                        Field('peak_detect',
+                        Field('kurt_coeff_1',
                               Access.RW,
-                              1,
-                              0),
+                              5,
+                              1),
+                        Field('kurt_coeff_2',
+                              Access.RW,
+                              5,
+                              1)
                     ]),
-                0b001: Register(
-                    'ddc_coeff_addr',
-                    [
-                        Field('coeff_waddr',
-                              Access.RW,
-                              10,
-                              0),
-                    ]),
-                0b010: Register(
-                    'ddc_coeff',
-                    [
-                        Field('coeff_wren',
-                              Access.Wpulse,
-                              1,
-                              0),
-                        Field('coeff_wdata',
-                              Access.RW,
-                              18,
-                              0),
-                    ]),
-                0b011: Register(
-                    'ddc_decimation',
-                    [
-                        Field('decimation1',
-                              Access.RW,
-                              7,
-                              0),
-                        Field('decimation2',
-                              Access.RW,
-                              6,
-                              0),
-                        Field('decimation3',
-                              Access.RW,
-                              7,
-                              0),
-                    ]),
-                0b100: Register(
-                    'ddc_frequency',
-                    [
-                        Field('frequency',
-                              Access.RW,
-                              28,
-                              0),
-                    ]),
-                0b101: Register(
-                    'ddc_control',
-                    [
-                        Field('operations_minus_one1',
-                              Access.RW,
-                              7,
-                              0),
-                        Field('operations_minus_one2',
-                              Access.RW,
-                              6,
-                              0),
-                        Field('operations_minus_one3',
-                              Access.RW,
-                              7,
-                              0),
-                        Field('odd_operations1',
-                              Access.RW,
-                              1,
-                              0),
-                        Field('odd_operations3',
-                              Access.RW,
-                              1,
-                              0),
-                        Field('bypass2',
-                              Access.RW,
-                              1,
-                              0),
-                        Field('bypass3',
-                              Access.RW,
-                              1,
-                              0),
-                        Field('enable_input',
-                              Access.RW,
-                              1,
-                              0),
-                    ]),
-            }, 3)
+                
+            }, 1)
         metadata = {
             'vendor': 'Daniel Estevez',
             'vendorID': 'destevez.net',
@@ -733,6 +654,8 @@ class TRTSDR(Elaboratable):
                 self.sdr_registers['spectrometer']['abort']),
             self.sdr_registers['spectrometer']['last_buffer'].eq(
                 self.spectrometer.last_buffer),
+            self.spectrometer.kurt1.eq(self.sdr_registers['spectrometer']['kurt_coeff_1']),
+            self.spectrometer.kurt2.eq(self.sdr_registers['spectrometer']['kurt_coeff_2'])
         ]
 
         # Recorder
@@ -827,10 +750,6 @@ class TRTSDR(Elaboratable):
         ]
 
         return m
-
-
-
-
 
 def write_svd(path):
     top = TRTSDR()##MaiaSDR()
