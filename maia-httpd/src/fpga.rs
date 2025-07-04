@@ -20,6 +20,9 @@ pub struct IpCore {
     spectrometer: Dma,
     // RAM-based cache for the number of spectrometer integrations
     spectrometer_integrations_exp: u32,
+    // RAM-based cache for kurtosis coefficient 1 and 2
+    spectrometer_kurt_1: u32,
+    spectrometer_kurt_2: u32
 }
 
 /// Interrupt waiter.
@@ -125,7 +128,10 @@ impl IpCore {
             spectrometer,
             // These are initialized to the correct value below, after removing
             // the SDR reset.
-            spectrometer_integrations_exp: 0,
+            spectrometer_integrations_exp: 5,
+            spectrometer_kurt_1: 1,
+            spectrometer_kurt_2: 2
+
         };
 
         ip_core.log_open().await?;
@@ -136,6 +142,22 @@ impl IpCore {
             .spectrometer()
             .read()
             .integrations_exp()
+            .bits()
+            .into();
+
+        ip_core.spectrometer_kurt_1 = ip_core
+            .registers
+            .spectrometer()
+            .read()
+            .kurt_coeff_1()
+            .bits()
+            .into();
+
+        ip_core.spectrometer_kurt_2 = ip_core
+            .registers
+            .spectrometer()
+            .read()
+            .kurt_coeff_2()
             .bits()
             .into();
         
@@ -196,6 +218,28 @@ impl IpCore {
             .into()
     }
 
+    
+    /// Gives the value of one of the kurtosis coefficients
+    ///
+    /// This register indicates the threshold of the kurtosis estimator. One = 1 shift the right = 0.5, Two = 2 shifts to the right = 0.25, ...
+    ///
+    /// Note: [`IpCore`] caches in RAM the value of this register every time
+    /// that it is updated, so calls to this function are very fast because the
+    /// FPGA register doesn't need to be accessed.
+    pub fn spectrometer_kurt_1(&self) -> u32 {
+        self.spectrometer_kurt_1
+    }
+
+    /// Gives the value of one of the kurtosis coefficients
+    ///
+    /// This register indicates the threshold of the kurtosis estimator. One = 1 shift the right = 0.5, Two = 2 shifts to the right = 0.25, ...
+    ///
+    /// Note: [`IpCore`] caches in RAM the value of this register every time
+    /// that it is updated, so calls to this function are very fast because the
+    /// FPGA register doesn't need to be accessed.
+    pub fn spectrometer_kurt_2(&self) -> u32 {
+        self.spectrometer_kurt_2
+    }
 
 
    
@@ -242,6 +286,43 @@ impl IpCore {
             })
         };
         self.spectrometer_integrations_exp = value;
+        Ok(())
+    }
+
+
+   /// sets the register of kurtosis coefficient 1
+    pub fn set_spectrometer_kurt_1(&mut self, value: u32) -> Result<()> {
+        // Limit the kurtosis threshold coeff to a maximum of 10 and a minimum of 1
+        const MAX_KURT: u32 = 10;
+        const MIN_KURT: u32 = 1;
+
+        if value > MAX_KURT || value < MIN_KURT {
+            anyhow::bail!("invalid kurtosis coefficient: {}", value);
+        }
+        unsafe {
+        self.registers
+            .spectrometer()
+            .modify(|_, w| w.kurt_coeff_1().bits(value as _) );
+        }
+        self.spectrometer_kurt_1 = value;
+        Ok(())
+    }
+
+    /// sets the register of kurtosis coefficient 2
+    pub fn set_spectrometer_kurt_2(&mut self, value: u32) -> Result<()> {
+        // Limit the kurtosis threshold coeff to a maximum of 10 and a minimum of 1
+        const MAX_KURT: u32 = 10;
+        const MIN_KURT: u32 = 1;
+
+        if value > MAX_KURT || value < MIN_KURT {
+            anyhow::bail!("invalid kurtosis coefficient: {}", value);
+        }
+        unsafe {
+        self.registers
+            .spectrometer()
+            .modify(|_, w| w.kurt_coeff_2().bits(value as _));
+        }
+        self.spectrometer_kurt_2 = value;
         Ok(())
     }
 

@@ -171,6 +171,10 @@ pub struct Spectrometer {
     pub integrations_exp: u32,
     /// FFT size (read-only).
     pub fft_size: u32,
+    /// kurtosis coefficient 1
+    pub kurt_1: u32,
+    /// kurtosis coefficient 2
+    pub kurt_2: u32
 }
 
 /// Spectrometer PATCH JSON schema.
@@ -187,6 +191,12 @@ pub struct PatchSpectrometer {
     /// Number of non-coherent integrations.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub integrations_exp: Option<u32>,
+    /// Kurtosis coefficient 1
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kurt_1: Option<u32>,
+    /// Kurtosis coefficient 2
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kurt_2: Option<u32>
     
 }
 

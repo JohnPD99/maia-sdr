@@ -67,13 +67,17 @@ impl Spectrometer {
             let samp_rate = self.state.spectrometer_config().samp_rate();
             let mut ip_core = self.state.ip_core().lock().unwrap();
             let integrations_exp = ip_core.spectrometer_integrations_exp() as u32;
+            let kurt_1 = ip_core.spectrometer_kurt_1() as u32;
+            let kurt_2 = ip_core.spectrometer_kurt_2() as u32;
             let num_integrations = (1u32 << integrations_exp) as f32; 
             let scale = BASE_SCALE / (num_integrations * samp_rate);
             tracing::trace!(
                 last_buffer = ip_core.spectrometer_last_buffer(),
                 samp_rate,
                 integrations_exp,
-                scale
+                scale,
+                kurt_1,
+                kurt_2
             );
             // TODO: potential optimization: do not hold the mutex locked while
             // we iterate over the buffers.

@@ -72,6 +72,8 @@ impl_preference_data! {
     ad9361_rx_gain_mode: maia_json::Ad9361GainMode = maia_json::Ad9361GainMode::SlowAttack,
     ad9361_rx_gain: f64 = 70.0,
     spectrometer_integrations_exp: u32 = 4,
+    spectrometer_kurt_1: u32 = 1,
+    spectrometer_kurt_2: u32 = 2,
     recording_metadata_filename: String = "recording".to_string(),
     recorder_prepend_timestamp: bool = false,
     recording_metadata_description: String = "".to_string(),

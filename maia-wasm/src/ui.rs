@@ -92,6 +92,10 @@ ui_elements! {
     ad9361_rx_gain: HtmlInputElement => NumberInput<f64>,
     spectrometer_integrations_exp: HtmlInputElement
         => NumberInput<u32, input::IntegerPresentation>,
+    spectrometer_kurt_1: HtmlInputElement
+        => NumberInput<u32, input::IntegerPresentation>,
+    spectrometer_kurt_2: HtmlInputElement
+        => NumberInput<u32, input::IntegerPresentation>,
     recording_metadata_filename: HtmlInputElement => TextInput,
     recorder_prepend_timestamp: HtmlInputElement => CheckboxInput,
     recording_metadata_description: HtmlInputElement => TextInput,
@@ -161,6 +165,8 @@ impl Ui {
             ad9361_rx_rf_bandwidth,
             ad9361_rx_gain_mode,
             spectrometer_integrations_exp,
+            spectrometer_kurt_1,
+            spectrometer_kurt_2,
             recording_metadata_filename,
             recorder_prepend_timestamp,
             recording_metadata_description,
@@ -774,7 +780,9 @@ impl Ui {
         maia_json::Spectrometer,
         maia_json::PatchSpectrometer,
         SPECTROMETER_URL,
-        integrations_exp
+        integrations_exp,
+        kurt_1,
+        kurt_2
     );
 
     // This function fakes an onchange event for the spectrometer_rate in order
@@ -787,6 +795,31 @@ impl Ui {
             .call0(&JsValue::NULL)?;
         Ok(())
     }
+
+
+    /* // This function updates kurt_1 coefficient
+    fn spectrometer_kurt_1_apply(&self, value: u32) {
+        let patch = maia_json::PatchSpectrometer {
+            kurt_1: Some(value as u32),
+            ..Default::default()
+        };
+        let ui = self.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            let _ = request::ignore_request_failed(ui.patch_spectrometer(&patch).await);
+        });
+    }
+
+    // This function updates kurt_2 coefficient
+    fn spectrometer_kurt_2_apply(&self, value: u32) {
+        let patch = maia_json::PatchSpectrometer {
+            kurt_2: Some(value as u32),
+            ..Default::default()
+        };
+        let ui = self.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            let _ = request::ignore_request_failed(ui.patch_spectrometer(&patch).await);
+        });
+    } */
 }
 
 // Time methods
