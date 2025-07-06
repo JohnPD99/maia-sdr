@@ -50,6 +50,7 @@ class TestSpectrumIntegrator(AmaranthSim):
             for _ in range(2)
         )
         async def set_inputs(ctx):
+            ctx.set(self.dut0.kurt_enable, 1)
             ctx.set(self.dut0.log2_nint, log2_integrations)
             ctx.set(self.dut0.kurt1, 1)
             ctx.set(self.dut0.kurt2, 3)

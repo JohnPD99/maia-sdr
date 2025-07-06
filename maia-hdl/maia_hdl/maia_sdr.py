@@ -546,6 +546,10 @@ class TRTSDR(Elaboratable):
                         Field('kurt_coeff_2',
                               Access.RW,
                               5,
+                              1),
+                        Field('kurt_enable',
+                              Access.RW,
+                              1,
                               1)
                     ]),
                 
@@ -655,7 +659,8 @@ class TRTSDR(Elaboratable):
             self.sdr_registers['spectrometer']['last_buffer'].eq(
                 self.spectrometer.last_buffer),
             self.spectrometer.kurt1.eq(self.sdr_registers['spectrometer']['kurt_coeff_1']),
-            self.spectrometer.kurt2.eq(self.sdr_registers['spectrometer']['kurt_coeff_2'])
+            self.spectrometer.kurt2.eq(self.sdr_registers['spectrometer']['kurt_coeff_2']),
+            self.spectrometer.kurt_enable.eq(self.sdr_registers['spectrometer']['kurt_enable'])
         ]
 
         # Recorder

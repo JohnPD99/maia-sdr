@@ -174,7 +174,9 @@ pub struct Spectrometer {
     /// kurtosis coefficient 1
     pub kurt_1: u32,
     /// kurtosis coefficient 2
-    pub kurt_2: u32
+    pub kurt_2: u32,
+    /// enable kurtosis thresholding
+    pub kurt_enable: bool
 }
 
 /// Spectrometer PATCH JSON schema.
@@ -196,7 +198,10 @@ pub struct PatchSpectrometer {
     pub kurt_1: Option<u32>,
     /// Kurtosis coefficient 2
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub kurt_2: Option<u32>
+    pub kurt_2: Option<u32>,
+    /// Kurtosis thresholding enable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kurt_enable: Option<bool>
     
 }
 
@@ -233,7 +238,7 @@ pub struct PatchRecorder {
     pub prepend_timestamp: Option<bool>,
     /// Maximum recording duration (in seconds).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub maximum_duration: Option<f64>,
+    pub maximum_duration: Option<f64>
 }
 
 /// Command to change the IQ recorder state.

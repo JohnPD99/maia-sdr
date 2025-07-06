@@ -96,6 +96,9 @@ ui_elements! {
         => NumberInput<u32, input::IntegerPresentation>,
     spectrometer_kurt_2: HtmlInputElement
         => NumberInput<u32, input::IntegerPresentation>,
+    spectrometer_kurt_thresh: HtmlSpanElement => Rc<HtmlSpanElement>,
+    spectrometer_kurt_enable: HtmlInputElement
+        => CheckboxInput,
     recording_metadata_filename: HtmlInputElement => TextInput,
     recorder_prepend_timestamp: HtmlInputElement => CheckboxInput,
     recording_metadata_description: HtmlInputElement => TextInput,
@@ -167,6 +170,7 @@ impl Ui {
             spectrometer_integrations_exp,
             spectrometer_kurt_1,
             spectrometer_kurt_2,
+            spectrometer_kurt_enable,
             recording_metadata_filename,
             recorder_prepend_timestamp,
             recording_metadata_description,
@@ -273,6 +277,7 @@ impl Ui {
         self.update_ad9361_inactive_elements(&json.ad9361)?;
         self.update_spectrometer_inactive_elements(&json.spectrometer)?;
         self.update_waterfall_rate(&json.spectrometer);
+        self.update_kurtosis_label(json.spectrometer.kurt_1, json.spectrometer.kurt_2);
         self.update_recorder_button(&json.recorder);
         self.update_recording_metadata_inactive_elements(&json.recording_metadata)?;
         self.update_recorder_inactive_elements(&json.recorder)?;
@@ -775,6 +780,7 @@ impl Ui {
 
 // Spectrometer methods
 impl Ui {
+
     impl_section!(
         spectrometer,
         maia_json::Spectrometer,
@@ -782,7 +788,8 @@ impl Ui {
         SPECTROMETER_URL,
         integrations_exp,
         kurt_1,
-        kurt_2
+        kurt_2,
+        kurt_enable
     );
 
     // This function fakes an onchange event for the spectrometer_rate in order
@@ -796,30 +803,16 @@ impl Ui {
         Ok(())
     }
 
+    fn update_kurtosis_label(&self, kurt1: u32, kurt2: u32) {
+        let val1 = 1.0 / (1u32 << kurt1) as f64;
+        let val2 = 1.0 / (1u32 << kurt2) as f64;
+        let total = val1 + val2;
 
-    /* // This function updates kurt_1 coefficient
-    fn spectrometer_kurt_1_apply(&self, value: u32) {
-        let patch = maia_json::PatchSpectrometer {
-            kurt_1: Some(value as u32),
-            ..Default::default()
-        };
-        let ui = self.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            let _ = request::ignore_request_failed(ui.patch_spectrometer(&patch).await);
-        });
+        self.elements
+            .spectrometer_kurt_thresh
+            .set_text_content(Some(&format!("{:.6}", total)));
     }
 
-    // This function updates kurt_2 coefficient
-    fn spectrometer_kurt_2_apply(&self, value: u32) {
-        let patch = maia_json::PatchSpectrometer {
-            kurt_2: Some(value as u32),
-            ..Default::default()
-        };
-        let ui = self.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            let _ = request::ignore_request_failed(ui.patch_spectrometer(&patch).await);
-        });
-    } */
 }
 
 // Time methods

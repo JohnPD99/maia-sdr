@@ -136,6 +136,7 @@ class S1_S2_module(Elaboratable):
 
         self.kurt1 = Signal(self.kurt_width, reset_less=True)
         self.kurt2 = Signal(self.kurt_width, reset_less=True)
+        self.kurt_enable = Signal()
 
         self.test = Signal()
 
@@ -393,6 +394,7 @@ class S1_S2_module(Elaboratable):
             kurtosis_module.kurt_shift_2.eq(self.kurt2),
             
             kurtosis_module.last_int.eq(last_fft_delay[-1]),
+            kurtosis_module.enable.eq(self.kurt_enable),
 
 
 

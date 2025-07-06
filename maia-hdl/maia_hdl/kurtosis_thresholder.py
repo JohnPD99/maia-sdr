@@ -64,6 +64,7 @@ class Kurtosis_Tresholder(Elaboratable):
         self.clken = Signal()
         self.common_edge = Signal()
         self.last_int = Signal()
+        self.enable = Signal()
 
 
     @property
@@ -211,7 +212,7 @@ class Kurtosis_Tresholder(Elaboratable):
         ]
 
 
-        with m.If(self.last_int):
+        with m.If(self.last_int & self.enable):
             with m.If((add5a_o > cpwr2_comparison) & (add5b_o < cpwr2_comparison)):
                 m.d.comb += cpwr_o_prev.eq(cpwr_delay[-1])
             with m.Else():
@@ -230,5 +231,5 @@ if __name__ == '__main__':
         kurt_thresh, ports=[kurt_thresh.cpwr_in, kurt_thresh.cpwr2_in, kurt_thresh.exp_cpwr_in, kurt_thresh.exp_cpwr2_in
                             , kurt_thresh.cpwr_out, kurt_thresh.cpwr2_out, kurt_thresh.exp_cpwr_out, kurt_thresh.exp_cpwr2_out,
                             kurt_thresh.common_edge, kurt_thresh.log2_nint, kurt_thresh.last_int, kurt_thresh.clken, 
-                            kurt_thresh.kurt_shift_1, kurt_thresh.kurt_shift_2],   platform=PlutoPlatform())
+                            kurt_thresh.kurt_shift_1, kurt_thresh.kurt_shift_2, kurt_thresh.enable],   platform=PlutoPlatform())
 

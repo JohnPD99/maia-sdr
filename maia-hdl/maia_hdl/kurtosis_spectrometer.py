@@ -87,6 +87,7 @@ class Kurthosis_Spectrometer(Elaboratable):
         self.interrupt_out = Signal()
         self.kurt1 = Signal(self.kurtwidth)
         self.kurt2 = Signal(self.kurtwidth)
+        self.kurt_enable = Signal()
 
     def ports(self):
         return self.dma.axi.ports() + [
@@ -99,7 +100,8 @@ class Kurthosis_Spectrometer(Elaboratable):
             self.last_buffer,
             self.interrupt_out,
             self.kurt1,
-            self.kurt2
+            self.kurt2,
+            self.kurt_enable
         ]
 
     def elaborate(self, platform):
@@ -153,6 +155,7 @@ class Kurthosis_Spectrometer(Elaboratable):
             integrator.rden.eq(dma.ren),
             integrator.kurt1.eq(self.kurt1),
             integrator.kurt2.eq(self.kurt2),
+            integrator.kurt_enable.eq(self.kurt_enable),
 
 
             dma.rdata.eq(dma_rdata),

@@ -1179,6 +1179,10 @@ pub mod maia_sdr {
         pub type KurtCoeff2R = crate::FieldReader;
         #[doc = "Field `kurt_coeff_2` writer - kurt_coeff_2"]
         pub type KurtCoeff2W<'a, REG> = crate::FieldWriter<'a, REG, 5>;
+        #[doc = "Field `kurt_enable` reader - kurt_enable"]
+        pub type KurtEnableR = crate::BitReader;
+        #[doc = "Field `kurt_enable` writer - kurt_enable"]
+        pub type KurtEnableW<'a, REG> = crate::BitWriter<'a, REG>;
         impl R {
             #[doc = "Bits 0:9 - integrations_exp"]
             #[inline(always)]
@@ -1199,6 +1203,11 @@ pub mod maia_sdr {
             #[inline(always)]
             pub fn kurt_coeff_2(&self) -> KurtCoeff2R {
                 KurtCoeff2R::new(((self.bits >> 19) & 0x1f) as u8)
+            }
+            #[doc = "Bit 24 - kurt_enable"]
+            #[inline(always)]
+            pub fn kurt_enable(&self) -> KurtEnableR {
+                KurtEnableR::new(((self.bits >> 24) & 1) != 0)
             }
         }
         impl W {
@@ -1221,6 +1230,11 @@ pub mod maia_sdr {
             #[inline(always)]
             pub fn kurt_coeff_2(&mut self) -> KurtCoeff2W<SpectrometerSpec> {
                 KurtCoeff2W::new(self, 19)
+            }
+            #[doc = "Bit 24 - kurt_enable"]
+            #[inline(always)]
+            pub fn kurt_enable(&mut self) -> KurtEnableW<SpectrometerSpec> {
+                KurtEnableW::new(self, 24)
             }
         }
         #[doc = "spectrometer\n\nYou can [`read`](crate::Reg::read) this register and get [`spectrometer::R`](R). You can [`write_with_zero`](crate::Reg::write_with_zero) this register using [`spectrometer::W`](W). You can also [`modify`](crate::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]

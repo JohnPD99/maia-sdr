@@ -22,7 +22,9 @@ pub struct IpCore {
     spectrometer_integrations_exp: u32,
     // RAM-based cache for kurtosis coefficient 1 and 2
     spectrometer_kurt_1: u32,
-    spectrometer_kurt_2: u32
+    spectrometer_kurt_2: u32,
+    // RAM-based cache for enablig kurtosis
+    spectrometer_kurt_enable:bool
 }
 
 /// Interrupt waiter.
@@ -130,7 +132,8 @@ impl IpCore {
             // the SDR reset.
             spectrometer_integrations_exp: 5,
             spectrometer_kurt_1: 1,
-            spectrometer_kurt_2: 2
+            spectrometer_kurt_2: 2,
+            spectrometer_kurt_enable: true
 
         };
 
@@ -159,6 +162,14 @@ impl IpCore {
             .read()
             .kurt_coeff_2()
             .bits()
+            .into();
+
+        ip_core.spectrometer_kurt_enable =  ip_core
+            .registers
+            .spectrometer()
+            .read()
+            .kurt_enable()
+            .bit()
             .into();
         
         let interrupt_handler = InterruptHandler::new(uio, interrupt_registers);
@@ -239,6 +250,17 @@ impl IpCore {
     /// FPGA register doesn't need to be accessed.
     pub fn spectrometer_kurt_2(&self) -> u32 {
         self.spectrometer_kurt_2
+    }
+
+    /// Gives the value of the kurtosis enable
+    ///
+    /// This register indicates if krutosis thresholding is activated or not.
+    ///
+    /// Note: [`IpCore`] caches in RAM the value of this register every time
+    /// that it is updated, so calls to this function are very fast because the
+    /// FPGA register doesn't need to be accessed.
+    pub fn spectrometer_kurt_enable(&self) -> bool {
+        self.spectrometer_kurt_enable
     }
 
 
@@ -323,6 +345,16 @@ impl IpCore {
             .modify(|_, w| w.kurt_coeff_2().bits(value as _));
         }
         self.spectrometer_kurt_2 = value;
+        Ok(())
+    }
+
+
+    /// sets the register of kurtosis enable
+    pub fn set_spectrometer_kurt_enable(&mut self, value: bool) -> Result<()> {
+        self.registers
+            .spectrometer()
+            .modify(|_, w| w.kurt_enable().bit(value as _) );
+        self.spectrometer_kurt_enable = value;
         Ok(())
     }
 

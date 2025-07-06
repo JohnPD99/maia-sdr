@@ -15,6 +15,7 @@ pub async fn spectrometer_json(state: &AppState) -> Result<Spectrometer> {
     let num_integrations = 1u32 << integrations_exp;
     let kurt_1 = ip_core.spectrometer_kurt_1();
     let kurt_2 = ip_core.spectrometer_kurt_2();
+    let kurt_enable = ip_core.spectrometer_kurt_enable();
     drop(ip_core);
     state
         .spectrometer_config()
@@ -25,7 +26,8 @@ pub async fn spectrometer_json(state: &AppState) -> Result<Spectrometer> {
         integrations_exp: integrations_exp,
         fft_size: FFT_SIZE,
         kurt_1:kurt_1,
-        kurt_2:kurt_2
+        kurt_2:kurt_2,
+        kurt_enable:kurt_enable
     })
 }
 
@@ -61,6 +63,12 @@ async fn update_spectrometer(state: &AppState, patch: &PatchSpectrometer) -> Res
     if let Some(k2) = patch.kurt_2 {
         ip_core
             .set_spectrometer_kurt_2(k2)
+            .map_err(JsonError::client_error)?;
+    }
+
+    if let Some(ken) = patch.kurt_enable {
+        ip_core
+            .set_spectrometer_kurt_enable(ken)
             .map_err(JsonError::client_error)?;
     }
 

@@ -253,6 +253,10 @@ form.ui {
     width: 4em;
 }
 
+.kurtosis_control input{
+    width: 3.5em;
+}
+
 input.rf_frequency {
     width: 7em;
 }
@@ -268,7 +272,7 @@ input.gain {
 
 
 #spectrometer_integrations_exp {
-    width: 5em;
+    width: 3.5em;
 }
 
 /* Record / Stop button */

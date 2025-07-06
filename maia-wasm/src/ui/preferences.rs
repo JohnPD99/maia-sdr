@@ -74,6 +74,7 @@ impl_preference_data! {
     spectrometer_integrations_exp: u32 = 4,
     spectrometer_kurt_1: u32 = 1,
     spectrometer_kurt_2: u32 = 2,
+    spectrometer_kurt_enable: bool = true,
     recording_metadata_filename: String = "recording".to_string(),
     recorder_prepend_timestamp: bool = false,
     recording_metadata_description: String = "".to_string(),

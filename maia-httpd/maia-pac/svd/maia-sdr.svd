@@ -184,6 +184,12 @@
               <bitRange>[23:19]</bitRange>
               <access>read-write</access>
             </field>
+            <field>
+              <name>kurt_enable</name>
+              <description>kurt_enable</description>
+              <bitRange>[24:24]</bitRange>
+              <access>read-write</access>
+            </field>
           </fields>
         </register>
       </registers>

@@ -60,6 +60,7 @@ class Test_kurtosis_thresholder(AmaranthSim):
         async def bench(ctx):
             for j in range(num_inputs):
                 await ctx.tick()
+                ctx.set(self.kurt_thresh.enable, 1)
                 ctx.set(self.kurt_thresh.clken, 1)
                 ctx.set(self.kurt_thresh.cpwr_in, int(cpwr_in[j]))
                 ctx.set(self.kurt_thresh.cpwr2_in, int(cpwr2_in[j]))
