@@ -54,10 +54,14 @@ if {[info exists plutoplus]} {
 }
 
 ad_ip_parameter sys_ps7 CONFIG.PCW_SPI1_PERIPHERAL_ENABLE 0
-ad_ip_parameter sys_ps7 CONFIG.PCW_I2C0_PERIPHERAL_ENABLE 0
 ad_ip_parameter sys_ps7 CONFIG.PCW_UART1_PERIPHERAL_ENABLE 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_UART1_UART1_IO {MIO 12 .. 13}
-ad_ip_parameter sys_ps7 CONFIG.PCW_I2C1_PERIPHERAL_ENABLE 0
+ad_ip_parameter sys_ps7 CONFIG.PCW_UART0_PERIPHERAL_ENABLE 1
+ad_ip_parameter sys_ps7 CONFIG.PCW_UART0_UART0_IO {MIO 10 .. 11}
+ad_ip_parameter sys_ps7 CONFIG.PCW_UART1_GRP_FULL_ENABLE 1
+ad_ip_parameter sys_ps7 CONFIG.PCW_UART0_GRP_FULL_ENABLE 1
+ad_ip_parameter sys_ps7 CONFIG.PCW_I2C1_PERIPHERAL_ENABLE 1
+ad_ip_parameter sys_ps7 CONFIG.PCW_I2C1_I2C1_IO {MIO 48 .. 49}
 ad_ip_parameter sys_ps7 CONFIG.PCW_QSPI_PERIPHERAL_ENABLE 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_QSPI_GRP_SINGLE_SS_ENABLE 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_SPI0_PERIPHERAL_ENABLE 1
@@ -97,10 +101,10 @@ ad_ip_parameter sys_ps7 CONFIG.PCW_IRQ_F2P_INTR 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_IRQ_F2P_MODE REVERSE
 ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_0_PULLUP {enabled}
 ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_9_PULLUP {enabled}
-ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_10_PULLUP {enabled}
-ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_11_PULLUP {enabled}
+#ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_10_PULLUP {enabled}
+#ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_11_PULLUP {enabled}
 ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_48_PULLUP {enabled}
-ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_49_PULLUP {disabled}
+ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_49_PULLUP {enabled}
 ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_53_PULLUP {enabled}
 
 # DDR MT41K256M16 HA-125 (32M, 16bit, 8banks)
