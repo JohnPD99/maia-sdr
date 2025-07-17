@@ -73,8 +73,9 @@ module system_top (
 
   inout           gpio_resetb,
   inout           gpio_en_agc,
-  inout   [ 3:0]  gpio_ctl,
+  output  [ 3:0]  gpio_ctl,
   inout   [ 7:0]  gpio_status,
+  output  [ 2:0]  rf_sw,
 
   output          spi_csn,
   output          spi_clk,
@@ -83,22 +84,21 @@ module system_top (
 
   // internal signals
 
-  wire    [16:0]  gpio_i;
-  wire    [16:0]  gpio_o;
-  wire    [16:0]  gpio_t;
+  wire    [12:0]  gpio_i;
+  wire    [12:0]  gpio_o;
+  wire    [12:0]  gpio_t;
 
   // instantiations
 
-  ad_iobuf #(.DATA_WIDTH(14)) i_iobuf (
-    .dio_t (gpio_t[13:0]),
-    .dio_i (gpio_o[13:0]),
-    .dio_o (gpio_i[13:0]),
-    .dio_p ({ gpio_resetb,        // 13:13
-              gpio_en_agc,        // 12:12
-              gpio_ctl,           // 11: 8
-              gpio_status}));     //  7: 0
+  ad_iobuf #(.DATA_WIDTH(10)) i_iobuf (
+    .dio_t (gpio_t[9:0]),
+    .dio_i (gpio_o[9:0]),
+    .dio_o (gpio_i[9:0]),
+    .dio_p ({ gpio_resetb,        // 9:9
+              gpio_en_agc,        // 8:8
+              gpio_status}));     // 7:0
 
-  assign gpio_i[16:14] = gpio_o[16:14];
+  assign gpio_i[12:10] = gpio_o[12:10];
 
   system_wrapper i_system_wrapper (
     .ddr_addr (ddr_addr),
@@ -129,7 +129,8 @@ module system_top (
     .rx_clk_in (rx_clk_in),
     .rx_data_in (rx_data_in),
     .rx_frame_in (rx_frame_in),
-
+    .rf_sw(rf_sw),
+    .gpio_ctl(gpio_ctl),
     .spi0_clk_i (1'b0),
     .spi0_clk_o (spi_clk),
     .spi0_csn_0_o (spi_csn),
@@ -144,8 +145,8 @@ module system_top (
     .tx_data_out (tx_data_out),
     .tx_frame_out (tx_frame_out),
     .txnrx (txnrx),
-    .up_enable (gpio_o[15]),
-    .up_txnrx (gpio_o[16]));
+    .up_enable (gpio_o[11]),
+    .up_txnrx (gpio_o[12]));
 
 endmodule
 

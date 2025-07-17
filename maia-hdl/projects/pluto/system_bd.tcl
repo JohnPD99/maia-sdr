@@ -22,9 +22,14 @@ create_bd_port -dir I spi0_sdo_i
 create_bd_port -dir O spi0_sdo_o
 create_bd_port -dir I spi0_sdi_i
 
-create_bd_port -dir I -from 16 -to 0 gpio_i
-create_bd_port -dir O -from 16 -to 0 gpio_o
-create_bd_port -dir O -from 16 -to 0 gpio_t
+create_bd_port -dir I -from 12 -to 0 gpio_i
+create_bd_port -dir O -from 12 -to 0 gpio_o
+create_bd_port -dir O -from 12 -to 0 gpio_t
+
+create_bd_port -dir O -from 3 -to 0 gpio_ctl
+create_bd_port -dir O -from 2 -to 0 rf_sw
+
+
 
 # instance: sys_ps7
 
@@ -42,7 +47,7 @@ ad_ip_parameter sys_ps7 CONFIG.PCW_EN_RST1_PORT 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ 100.0
 ad_ip_parameter sys_ps7 CONFIG.PCW_FPGA1_PERIPHERAL_FREQMHZ 200.0
 ad_ip_parameter sys_ps7 CONFIG.PCW_GPIO_EMIO_GPIO_ENABLE 1
-ad_ip_parameter sys_ps7 CONFIG.PCW_GPIO_EMIO_GPIO_IO 17
+ad_ip_parameter sys_ps7 CONFIG.PCW_GPIO_EMIO_GPIO_IO 13
 
 if {[info exists plutoplus]} {
     # Pluto+ Ethernet (not available in ADALM Pluto)
@@ -58,8 +63,6 @@ ad_ip_parameter sys_ps7 CONFIG.PCW_UART1_PERIPHERAL_ENABLE 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_UART1_UART1_IO {MIO 12 .. 13}
 ad_ip_parameter sys_ps7 CONFIG.PCW_UART0_PERIPHERAL_ENABLE 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_UART0_UART0_IO {MIO 10 .. 11}
-ad_ip_parameter sys_ps7 CONFIG.PCW_UART1_GRP_FULL_ENABLE 1
-ad_ip_parameter sys_ps7 CONFIG.PCW_UART0_GRP_FULL_ENABLE 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_I2C1_PERIPHERAL_ENABLE 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_I2C1_I2C1_IO {MIO 48 .. 49}
 ad_ip_parameter sys_ps7 CONFIG.PCW_QSPI_PERIPHERAL_ENABLE 1
@@ -101,8 +104,6 @@ ad_ip_parameter sys_ps7 CONFIG.PCW_IRQ_F2P_INTR 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_IRQ_F2P_MODE REVERSE
 ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_0_PULLUP {enabled}
 ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_9_PULLUP {enabled}
-#ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_10_PULLUP {enabled}
-#ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_11_PULLUP {enabled}
 ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_48_PULLUP {enabled}
 ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_49_PULLUP {enabled}
 ad_ip_parameter sys_ps7 CONFIG.PCW_MIO_53_PULLUP {enabled}
@@ -263,6 +264,8 @@ ad_connect  axi_ad9361/adc_data_i0 adc_i_slice/Din
 ad_connect  axi_ad9361/adc_data_q0 adc_q_slice/Din
 ad_connect  adc_i_slice/Dout maia_sdr/re_in
 ad_connect  adc_q_slice/Dout maia_sdr/im_in
+ad_connect  gpio_ctl maia_sdr/gpio_ctl
+ad_connect  rf_sw maia_sdr/rf_sw
 ad_connect  axi_ad9361/l_clk maia_sdr/sampling_clk
 ad_connect  sys_cpu_clk maia_sdr/s_axi_lite_clk
 ad_connect  sys_cpu_reset maia_sdr/s_axi_lite_rst
@@ -272,6 +275,7 @@ ad_connect  maia_sdr_clk/clk_out3 maia_sdr/clk3x_clk
 
 ad_connect  sys_cpu_clk maia_sdr_clk/clk_in1
 ad_connect  sys_cpu_reset maia_sdr_clk/reset
+
 
 if {[info exists maia_iio]} {
 

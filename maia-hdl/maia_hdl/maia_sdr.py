@@ -575,6 +575,11 @@ class TRTSDR(Elaboratable):
         self.im_in = Signal(self.iq_in_width)
         self.interrupt_out = Signal()
 
+        # Control Signals
+        self.gpio_ctl = Signal(4)
+
+        self.rf_sw = Signal(3)
+
     def ports(self):
         return (
             self.axi4lite.axi.ports()
@@ -591,6 +596,8 @@ class TRTSDR(Elaboratable):
                 self.sync.rst,
                 self.clk2x.clk,
                 self.clk3x.clk,
+                self.gpio_ctl,
+                self.rf_sw
             ]
         )
 
@@ -753,6 +760,10 @@ class TRTSDR(Elaboratable):
             interrupts_reg['spectrometer'].eq(sync_spectrometer_interrupt.o),
             interrupts_reg['recorder'].eq(self.recorder.finished),
         ]
+
+        # Preliminary pin control
+        m.d.comb += self.gpio_ctl.eq(0b0110)
+        m.d.comb += self.rf_sw.eq(0b111)
 
         return m
 
