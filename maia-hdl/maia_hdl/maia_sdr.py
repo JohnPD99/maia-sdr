@@ -550,7 +550,23 @@ class TRTSDR(Elaboratable):
                         Field('kurt_enable',
                               Access.RW,
                               1,
-                              1)
+                              1),
+                        Field('port_select',
+                              Access.RW,
+                              2,
+                              0),
+                        Field('lpf_select',
+                              Access.RW,
+                              1,
+                              0),
+                        Field('freq_profile',
+                              Access.RW,
+                              3,
+                              0),
+                        Field('sweep_enable',
+                              Access.RW,
+                              1,
+                              0)
                     ]),
                 
             }, 1)
@@ -667,7 +683,11 @@ class TRTSDR(Elaboratable):
                 self.spectrometer.last_buffer),
             self.spectrometer.kurt1.eq(self.sdr_registers['spectrometer']['kurt_coeff_1']),
             self.spectrometer.kurt2.eq(self.sdr_registers['spectrometer']['kurt_coeff_2']),
-            self.spectrometer.kurt_enable.eq(self.sdr_registers['spectrometer']['kurt_enable'])
+            self.spectrometer.kurt_enable.eq(self.sdr_registers['spectrometer']['kurt_enable']),
+            self.spectrometer.port_select.eq(self.sdr_registers['spectrometer']['port_select']),
+            self.spectrometer.freq_profile.eq(self.sdr_registers['spectrometer']['freq_profile']),
+            self.spectrometer.lpf_select.eq(self.sdr_registers['spectrometer']['lpf_select']),
+            self.spectrometer.sweep_enable.eq(self.sdr_registers['spectrometer']['sweep_enable']),
         ]
 
         # Recorder
@@ -762,8 +782,8 @@ class TRTSDR(Elaboratable):
         ]
 
         # Preliminary pin control
-        m.d.comb += self.gpio_ctl.eq(0b0110)
-        m.d.comb += self.rf_sw.eq(0b111)
+        m.d.comb += self.gpio_ctl.eq(self.spectrometer.gpio_ctl)
+        m.d.comb += self.rf_sw.eq(self.spectrometer.rf_sw)
 
         return m
 

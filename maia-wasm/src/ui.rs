@@ -99,6 +99,11 @@ ui_elements! {
     spectrometer_kurt_thresh: HtmlSpanElement => Rc<HtmlSpanElement>,
     spectrometer_kurt_enable: HtmlInputElement
         => CheckboxInput,
+    spectrometer_sweep_enable: HtmlInputElement
+        => CheckboxInput,
+    
+    // TODO
+    
     recording_metadata_filename: HtmlInputElement => TextInput,
     recorder_prepend_timestamp: HtmlInputElement => CheckboxInput,
     recording_metadata_description: HtmlInputElement => TextInput,

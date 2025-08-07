@@ -24,7 +24,15 @@ pub struct IpCore {
     spectrometer_kurt_1: u32,
     spectrometer_kurt_2: u32,
     // RAM-based cache for enablig kurtosis
-    spectrometer_kurt_enable:bool
+    spectrometer_kurt_enable:bool,
+    // RAM-based cache for enabling frequency sweep
+    spectrometer_sweep_enable:bool,
+    // RAM-based cache for selecting port of radiometer
+    spectrometer_port_select:u32,
+    // RAM-based cache for selecting low pass filter of radiometer
+    spectrometer_lpf_select:bool,
+    // RAM-based cache for selecting frequency profile of radiometer
+    spectrometer_freq_profile:u32,
 }
 
 /// Interrupt waiter.
@@ -133,7 +141,11 @@ impl IpCore {
             spectrometer_integrations_exp: 5,
             spectrometer_kurt_1: 1,
             spectrometer_kurt_2: 2,
-            spectrometer_kurt_enable: true
+            spectrometer_kurt_enable: true,
+            spectrometer_sweep_enable: false,
+            spectromteer_port_select:0,
+            spectrometer_lpf_select:0,
+            spectrometer_freq_profile:0
 
         };
 
@@ -161,6 +173,38 @@ impl IpCore {
             .spectrometer()
             .read()
             .kurt_coeff_2()
+            .bits()
+            .into();
+
+        ip_core.spectrometer_sweep_enable =  ip_core
+            .registers
+            .spectrometer()
+            .read()
+            .sweep_enable()
+            .bit()
+            .into();
+
+        ip_core.spectrometer_port_select =  ip_core
+            .registers
+            .spectrometer()
+            .read()
+            .port_select()
+            .bits()
+            .into();
+
+        ip_core.spectrometer_lpf_select =  ip_core
+            .registers
+            .spectrometer()
+            .read()
+            .lpf_select()
+            .bit()
+            .into();
+
+        ip_core.spectrometer_freq_profile =  ip_core
+            .registers
+            .spectrometer()
+            .read()
+            .freq_profile()
             .bits()
             .into();
 
@@ -264,6 +308,52 @@ impl IpCore {
     }
 
 
+    /// Gives the value of the sweep enable
+    ///
+    /// This register indicates if the sensor is sweeping or not.
+    ///
+    /// Note: [`IpCore`] caches in RAM the value of this register every time
+    /// that it is updated, so calls to this function are very fast because the
+    /// FPGA register doesn't need to be accessed.
+    pub fn spectrometer_sweep_enable(&self) -> bool {
+        self.spectrometer_sweep_enable
+    }
+
+    /// Gives the value of the port select
+    ///
+    /// This register indicates what port is selected for the radiometer
+    ///
+    /// Note: [`IpCore`] caches in RAM the value of this register every time
+    /// that it is updated, so calls to this function are very fast because the
+    /// FPGA register doesn't need to be accessed.
+    pub fn spectrometer_port_select(&self) -> u32 {
+        self.spectrometer_port_select
+    }
+
+    /// Gives the value of the freq profile
+    ///
+    /// This register indicates what frequency profile is selected.
+    ///
+    /// Note: [`IpCore`] caches in RAM the value of this register every time
+    /// that it is updated, so calls to this function are very fast because the
+    /// FPGA register doesn't need to be accessed.
+    pub fn spectrometer_freq_profile(&self) -> u32 {
+        self.spectrometer_freq_profile
+    }
+
+    // Gives the value of the lpf select
+    ///
+    /// This register indicates which low pass filter is selected
+    ///
+    /// Note: [`IpCore`] caches in RAM the value of this register every time
+    /// that it is updated, so calls to this function are very fast because the
+    /// FPGA register doesn't need to be accessed.
+    pub fn spectrometer_lpf_select(&self) -> bool {
+        self.spectrometer_lpf_select
+    }
+
+
+
    
     /// Gives the value of the number of integrations register of the spectrometer.
     ///
@@ -357,6 +447,61 @@ impl IpCore {
         self.spectrometer_kurt_enable = value;
         Ok(())
     }
+
+    /// sets the register for sweep enable
+    pub fn set_spectrometer_sweep_enable(&mut self, value: bool) -> Result<()> {
+        self.registers
+            .spectrometer()
+            .modify(|_, w| w.sweep_enable().bit(value as _) );
+        self.spectrometer_sweep_enable = value;
+        Ok(())
+    }
+
+     /// sets the register for lpf select
+    pub fn set_spectrometer_lpf_select(&mut self, value: bool) -> Result<()> {
+        self.registers
+            .spectrometer()
+            .modify(|_, w| w.lpf_select().bit(value as _) );
+        self.spectrometer_lpf_select = value;
+        Ok(())
+    }
+
+     /// sets the register for port select
+    pub fn set_spectrometer_port_select(&mut self, value: u32) -> Result<()> {
+        // Limit the value between 0 and 3
+        const MAX_PORT_SELECT: u32 = 3;
+        const MIN_PORT_SELECT: u32 = 0;
+
+        if value > MAX_PORT_SELECT || value < MIN_PORT_SELECT {
+            anyhow::bail!("invalid port value: {}", value);
+        }
+        unsafe {
+        self.registers
+            .spectrometer()
+            .modify(|_, w| w.port_select().bits(value as _));
+        }
+        self.spectrometer_port_select = value;
+        Ok(())
+    }
+
+     /// sets the register for freq profile
+    pub fn set_spectrometer_freq_profile(&mut self, value: u32) -> Result<()> {
+        // Limit the value between 0 and 7
+        const MAX_FREQ_PROFILE: u32 = 7;
+        const MIN_FREQ_PROFILE: u32 = 0;
+
+        if value > MAX_FREQ_PROFILE || value < MIN_FREQ_PROFILE {
+            anyhow::bail!("invalid frequency profile: {}", value);
+        }
+        unsafe {
+        self.registers
+            .spectrometer()
+            .modify(|_, w| w.freq_profile().bits(value as _));
+        }
+        self.spectrometer_freq_profile = value;
+        Ok(())
+    }
+
 
 
     /// Returns the new buffers that have been written by the spectrometer.

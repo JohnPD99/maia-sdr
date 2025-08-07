@@ -13,6 +13,7 @@ import numpy as np
 from .dma import DmaBRAMWrite
 from .fft import FFT
 from .s1_s2_module import S1_S2_module
+from .radiometer_control import Radiometer_control
 
 
 class Kurthosis_Spectrometer(Elaboratable):
@@ -88,6 +89,14 @@ class Kurthosis_Spectrometer(Elaboratable):
         self.kurt1 = Signal(self.kurtwidth)
         self.kurt2 = Signal(self.kurtwidth)
         self.kurt_enable = Signal()
+        self.port_select = Signal(2)
+        self.freq_profile = Signal(3)
+        self.lpf_select = Signal()
+        self.sweep_enable = Signal()
+
+        self.rf_sw = Signal(3)
+        self.gpio_ctl = Signal(4)
+
 
     def ports(self):
         return self.dma.axi.ports() + [
@@ -118,9 +127,12 @@ class Kurthosis_Spectrometer(Elaboratable):
         assert width_fft_out == 22
 
         spectrum_fp_width = 18
+        
         m.submodules.integrator = integrator = S1_S2_module(
             self._domain_3x, width_fft_out, spectrum_fp_width,
             self.nint_width, self.fft_order_log2, self.kurtwidth)
+        
+        m.submodules.control = control = Radiometer_control()
         # Form 64-bit rdata for the DMA. The exponent is placed in the 8 MSBs
         # and the value is placed in the LSBs, leaving a gap with zeros between
         # them
@@ -145,7 +157,7 @@ class Kurthosis_Spectrometer(Elaboratable):
             fft.im_in.eq(self.im_in),
 
             integrator.log2_nint.eq(self.log2_number_integrations),
-            integrator.abort.eq(self.abort),
+            integrator.abort.eq(self.abort | control.abort),
             integrator.clken.eq(self.strobe_in),
             integrator.common_edge.eq(self.common_edge_3x),
             integrator.input_last.eq(fft.out_last),
@@ -157,12 +169,22 @@ class Kurthosis_Spectrometer(Elaboratable):
             integrator.kurt2.eq(self.kurt2),
             integrator.kurt_enable.eq(self.kurt_enable),
 
+            control.clken.eq(self.strobe_in),
+            control.integration_done.eq(integrator.done),
+            control.sweep_mode.eq(self.sweep_enable),
+            control.port_select.eq(self.port_select),
+            control.freq_select.eq(self.freq_profile),
+            control.lpf_select.eq(self.lpf_select),
+
 
             dma.rdata.eq(dma_rdata),
             dma.start.eq(integrator.done),
             self.last_buffer.eq(dma.last_buffer),
 
             self.interrupt_out.eq(~dma.busy & dma_busy_q),
+
+            self.rf_sw.eq(control.rf_sw),
+            self.gpio_ctl.eq(control.gpio_ctl)
         ]
         return m
 

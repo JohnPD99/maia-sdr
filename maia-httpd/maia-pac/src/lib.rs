@@ -1183,6 +1183,22 @@ pub mod maia_sdr {
         pub type KurtEnableR = crate::BitReader;
         #[doc = "Field `kurt_enable` writer - kurt_enable"]
         pub type KurtEnableW<'a, REG> = crate::BitWriter<'a, REG>;
+        #[doc = "Field `port_select` reader - port_select"]
+        pub type PortSelectR = crate::FieldReader;
+        #[doc = "Field `port_select` writer - port_select"]
+        pub type PortSelectW<'a, REG> = crate::FieldWriter<'a, REG, 2>;
+        #[doc = "Field `lpf_select` reader - lpf_select"]
+        pub type LpfSelectR = crate::BitReader;
+        #[doc = "Field `lpf_select` writer - lpf_select"]
+        pub type LpfSelectW<'a, REG> = crate::BitWriter<'a, REG>;
+        #[doc = "Field `freq_profile` reader - freq_profile"]
+        pub type FreqProfileR = crate::FieldReader;
+        #[doc = "Field `freq_profile` writer - freq_profile"]
+        pub type FreqProfileW<'a, REG> = crate::FieldWriter<'a, REG, 3>;
+        #[doc = "Field `sweep_enable` reader - sweep_enable"]
+        pub type SweepEnableR = crate::BitReader;
+        #[doc = "Field `sweep_enable` writer - sweep_enable"]
+        pub type SweepEnableW<'a, REG> = crate::BitWriter<'a, REG>;
         impl R {
             #[doc = "Bits 0:9 - integrations_exp"]
             #[inline(always)]
@@ -1208,6 +1224,26 @@ pub mod maia_sdr {
             #[inline(always)]
             pub fn kurt_enable(&self) -> KurtEnableR {
                 KurtEnableR::new(((self.bits >> 24) & 1) != 0)
+            }
+            #[doc = "Bits 25:26 - port_select"]
+            #[inline(always)]
+            pub fn port_select(&self) -> PortSelectR {
+                PortSelectR::new(((self.bits >> 25) & 3) as u8)
+            }
+            #[doc = "Bit 27 - lpf_select"]
+            #[inline(always)]
+            pub fn lpf_select(&self) -> LpfSelectR {
+                LpfSelectR::new(((self.bits >> 27) & 1) != 0)
+            }
+            #[doc = "Bits 28:30 - freq_profile"]
+            #[inline(always)]
+            pub fn freq_profile(&self) -> FreqProfileR {
+                FreqProfileR::new(((self.bits >> 28) & 7) as u8)
+            }
+            #[doc = "Bit 31 - sweep_enable"]
+            #[inline(always)]
+            pub fn sweep_enable(&self) -> SweepEnableR {
+                SweepEnableR::new(((self.bits >> 31) & 1) != 0)
             }
         }
         impl W {
@@ -1235,6 +1271,26 @@ pub mod maia_sdr {
             #[inline(always)]
             pub fn kurt_enable(&mut self) -> KurtEnableW<SpectrometerSpec> {
                 KurtEnableW::new(self, 24)
+            }
+            #[doc = "Bits 25:26 - port_select"]
+            #[inline(always)]
+            pub fn port_select(&mut self) -> PortSelectW<SpectrometerSpec> {
+                PortSelectW::new(self, 25)
+            }
+            #[doc = "Bit 27 - lpf_select"]
+            #[inline(always)]
+            pub fn lpf_select(&mut self) -> LpfSelectW<SpectrometerSpec> {
+                LpfSelectW::new(self, 27)
+            }
+            #[doc = "Bits 28:30 - freq_profile"]
+            #[inline(always)]
+            pub fn freq_profile(&mut self) -> FreqProfileW<SpectrometerSpec> {
+                FreqProfileW::new(self, 28)
+            }
+            #[doc = "Bit 31 - sweep_enable"]
+            #[inline(always)]
+            pub fn sweep_enable(&mut self) -> SweepEnableW<SpectrometerSpec> {
+                SweepEnableW::new(self, 31)
             }
         }
         #[doc = "spectrometer\n\nYou can [`read`](crate::Reg::read) this register and get [`spectrometer::R`](R). You can [`write_with_zero`](crate::Reg::write_with_zero) this register using [`spectrometer::W`](W). You can also [`modify`](crate::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]

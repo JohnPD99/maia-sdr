@@ -176,7 +176,15 @@ pub struct Spectrometer {
     /// kurtosis coefficient 2
     pub kurt_2: u32,
     /// enable kurtosis thresholding
-    pub kurt_enable: bool
+    pub kurt_enable: bool,
+    /// enable frequency sweeping
+    pub sweep_enable: bool,
+    /// low pass filter selection
+    pub lpf_select: bool,
+    /// port selection
+    pub port_select: u32,
+    /// frequency selection
+    pub freq_profile: u32
 }
 
 /// Spectrometer PATCH JSON schema.
@@ -202,6 +210,19 @@ pub struct PatchSpectrometer {
     /// Kurtosis thresholding enable
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kurt_enable: Option<bool>
+    /// Frequency sweep enable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sweep_enable: Option<bool>
+    /// LPF selection
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lpf_select: Option<bool>
+    /// port selection
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port_select: Option<u32>
+    /// Ffrequency profile selection
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub freq_profile: Option<u32>
+    
     
 }
 

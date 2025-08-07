@@ -16,6 +16,10 @@ pub async fn spectrometer_json(state: &AppState) -> Result<Spectrometer> {
     let kurt_1 = ip_core.spectrometer_kurt_1();
     let kurt_2 = ip_core.spectrometer_kurt_2();
     let kurt_enable = ip_core.spectrometer_kurt_enable();
+    let sweep_enable = ip_core.spectrometer_sweep_enable();
+    let port_select = ip_core.spectrometer_port_select();
+    let lpf_select = ip_core.spectrometer_port_select();
+    let freq_profile = ip_core.spectrometer_freq_profile();
     drop(ip_core);
     state
         .spectrometer_config()
@@ -27,7 +31,11 @@ pub async fn spectrometer_json(state: &AppState) -> Result<Spectrometer> {
         fft_size: FFT_SIZE,
         kurt_1:kurt_1,
         kurt_2:kurt_2,
-        kurt_enable:kurt_enable
+        kurt_enable:kurt_enable,
+        sweep_enable:sweep_enable,
+        port_select:port_select,
+        lpf_select:lpf_select,
+        freq_profile:freq_profile
     })
 }
 
@@ -71,6 +79,32 @@ async fn update_spectrometer(state: &AppState, patch: &PatchSpectrometer) -> Res
             .set_spectrometer_kurt_enable(ken)
             .map_err(JsonError::client_error)?;
     }
+    
+    if let Some(sen) = patch.sweep_enable {
+    ip_core
+        .set_spectrometer_sweep_enable(sen)
+        .map_err(JsonError::client_error)?;
+    }
+
+    if let Some(pse) = patch.port_select {
+    ip_core
+        .set_spectrometer_port_select(pse)
+        .map_err(JsonError::client_error)?;
+    }
+
+     
+    if let Some(fp) = patch.freq_profile {
+    ip_core
+        .set_spectrometer_freq_profile(fp)
+        .map_err(JsonError::client_error)?;
+    }
+
+    if let Some(lse) = patch.lpf_select {
+    ip_core
+        .set_spectrometer_lpf_select(lse)
+        .map_err(JsonError::client_error)?;
+    }
+
 
     Ok(())
 }

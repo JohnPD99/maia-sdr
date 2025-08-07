@@ -31,6 +31,9 @@
           <!-- <button id="ddc_tab" role="tab" aria-selected="false" aria-controls="ddc_panel">
             DDC
           </button> -->
+          <button id="measurement_tab" role="tab" aria-selected="false" aria-controls="measurement_panel">
+            Measurement
+          </button>
           <button id="waterfall_tab" role="tab" aria-selected="false" aria-controls="waterfall_panel">
             Waterfall
           </button>
@@ -87,6 +90,18 @@
             <input type="checkbox" id="waterfall_show_spectrum">
           </form>
         </div>
+
+        <div id="measurement_panel" class="hidden" role="tabpanel" aria-labelledby="measurement_tab">
+          <form>
+            <label>Start Sweep
+            <input type="checkbox" id="spectrometer_sweep_enable">
+            </label>
+          </form>
+        </div>
+
+
+
+
         <div id="geolocation_panel" class="hidden" role="tabpanel" aria-labelledby="geolocation_tab">
           <form>
             <div>
@@ -150,6 +165,22 @@
           <input type="number" id="spectrometer_kurt_2" step="1" min="1">
           <span id="spectrometer_kurt_thresh">0.524532</span>
         </fieldset>
+
+        <label>Port Select
+          <input type="number" id="spectrometer_port_select" step="1" min="0">
+        </label>
+
+        <label>LPF Select
+          <input type="number" id="spectrometer_lpf_select" step="1" min="0">
+        </label>
+
+        <label>Frequency Profile Selection
+          <input type="number" id="spectrometer_freq_profile" step="1" min="0">
+        </label>
+
+
+
+
         <button type="button" id="recorder_button" class="record_button"></button>
         <button type="button" id="settings_button">Settings</button>
       </form>

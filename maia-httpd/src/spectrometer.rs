@@ -70,6 +70,10 @@ impl Spectrometer {
             let kurt_1 = ip_core.spectrometer_kurt_1() as u32;
             let kurt_2 = ip_core.spectrometer_kurt_2() as u32;
             let kurt_enable = ip_core.spectrometer_kurt_enable() as bool;
+            let sweep_enable = ip_core.spectrometer_sweep_enable() as bool;
+            let lpf_select = ip_core.spectrometer_lpf_select() as bool;
+            let port_select = ip_core.spectrometer_port_select() as u32;
+            let freq_profile = ip_core.spectrometer_port_select() as u32;
             let num_integrations = (1u32 << integrations_exp) as f32; 
             let scale = BASE_SCALE / (num_integrations * samp_rate);
             tracing::trace!(
@@ -79,7 +83,11 @@ impl Spectrometer {
                 scale,
                 kurt_1,
                 kurt_2,
-                kurt_enable
+                kurt_enable,
+                sweep_enable,
+                lpf_select,
+                port_select,
+                freq_profile
             );
             // TODO: potential optimization: do not hold the mutex locked while
             // we iterate over the buffers.

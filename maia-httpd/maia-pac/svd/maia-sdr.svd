@@ -190,6 +190,30 @@
               <bitRange>[24:24]</bitRange>
               <access>read-write</access>
             </field>
+             <field>
+              <name>port_select</name>
+              <description>port_select</description>
+              <bitRange>[26:25]</bitRange>
+              <access>read-write</access>
+            </field>
+            <field>
+              <name>lpf_select</name>
+              <description>lpf_select</description>
+              <bitRange>[27:27]</bitRange>
+              <access>read-write</access>
+            </field>
+            <field>
+              <name>freq_profile</name>
+              <description>freq_profile</description>
+              <bitRange>[30:28]</bitRange>
+              <access>read-write</access>
+            </field>
+             <field>
+              <name>sweep_enable</name>
+              <description>sweep_enable</description>
+              <bitRange>[31:31]</bitRange>
+              <access>read-write</access>
+            </field>
           </fields>
         </register>
       </registers>
