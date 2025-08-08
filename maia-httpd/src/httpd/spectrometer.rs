@@ -18,7 +18,7 @@ pub async fn spectrometer_json(state: &AppState) -> Result<Spectrometer> {
     let kurt_enable = ip_core.spectrometer_kurt_enable();
     let sweep_enable = ip_core.spectrometer_sweep_enable();
     let port_select = ip_core.spectrometer_port_select();
-    let lpf_select = ip_core.spectrometer_port_select();
+    let lpf_select = ip_core.spectrometer_lpf_select();
     let freq_profile = ip_core.spectrometer_freq_profile();
     drop(ip_core);
     state

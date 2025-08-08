@@ -143,8 +143,8 @@ impl IpCore {
             spectrometer_kurt_2: 2,
             spectrometer_kurt_enable: true,
             spectrometer_sweep_enable: false,
-            spectromteer_port_select:0,
-            spectrometer_lpf_select:0,
+            spectrometer_port_select:0,
+            spectrometer_lpf_select:false,
             spectrometer_freq_profile:0
 
         };

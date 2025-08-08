@@ -73,7 +73,7 @@ impl Spectrometer {
             let sweep_enable = ip_core.spectrometer_sweep_enable() as bool;
             let lpf_select = ip_core.spectrometer_lpf_select() as bool;
             let port_select = ip_core.spectrometer_port_select() as u32;
-            let freq_profile = ip_core.spectrometer_port_select() as u32;
+            let freq_profile = ip_core.spectrometer_freq_profile() as u32;
             let num_integrations = (1u32 << integrations_exp) as f32; 
             let scale = BASE_SCALE / (num_integrations * samp_rate);
             tracing::trace!(

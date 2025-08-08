@@ -167,11 +167,19 @@
         </fieldset>
 
         <label>Port Select
-          <input type="number" id="spectrometer_port_select" step="1" min="0">
+          <select id="spectrometer_port_select">
+	          <option value="0">RS</option>
+	          <option value="1">H</option>
+            <option value="2">V</option>
+            <option value="3">ACS</option>
+          </select>
         </label>
 
         <label>LPF Select
-          <input type="number" id="spectrometer_lpf_select" step="1" min="0">
+           <select id="spectrometer_lpf_select">
+	          <option value="false">700 MHz</option>
+	          <option value="true">1500 MHz</option>
+          </select>
         </label>
 
         <label>Frequency Profile Selection

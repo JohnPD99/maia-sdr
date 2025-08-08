@@ -209,16 +209,16 @@ pub struct PatchSpectrometer {
     pub kurt_2: Option<u32>,
     /// Kurtosis thresholding enable
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub kurt_enable: Option<bool>
+    pub kurt_enable: Option<bool>,
     /// Frequency sweep enable
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub sweep_enable: Option<bool>
+    pub sweep_enable: Option<bool>,
     /// LPF selection
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub lpf_select: Option<bool>
+    pub lpf_select: Option<bool>,
     /// port selection
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub port_select: Option<u32>
+    pub port_select: Option<u32>,
     /// Ffrequency profile selection
     #[serde(skip_serializing_if = "Option::is_none")]
     pub freq_profile: Option<u32>

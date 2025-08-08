@@ -101,9 +101,12 @@ ui_elements! {
         => CheckboxInput,
     spectrometer_sweep_enable: HtmlInputElement
         => CheckboxInput,
-    
-    // TODO
-    
+    spectrometer_port_select: HtmlSelectElement 
+        => EnumInput<u32>,
+    spectrometer_lpf_select: HtmlSelectElement 
+        => EnumInput<bool>,
+    spectrometer_freq_profile: HtmlInputElement
+        => NumberInput<u32, input::IntegerPresentation>,    
     recording_metadata_filename: HtmlInputElement => TextInput,
     recorder_prepend_timestamp: HtmlInputElement => CheckboxInput,
     recording_metadata_description: HtmlInputElement => TextInput,
@@ -176,6 +179,10 @@ impl Ui {
             spectrometer_kurt_1,
             spectrometer_kurt_2,
             spectrometer_kurt_enable,
+            spectrometer_sweep_enable,
+            spectrometer_port_select,
+            spectrometer_lpf_select,
+            spectrometer_freq_profile,
             recording_metadata_filename,
             recorder_prepend_timestamp,
             recording_metadata_description,
@@ -794,7 +801,12 @@ impl Ui {
         integrations_exp,
         kurt_1,
         kurt_2,
-        kurt_enable
+        kurt_enable,
+        port_select,
+        lpf_select,
+        freq_profile,
+        sweep_enable
+        
     );
 
     // This function fakes an onchange event for the spectrometer_rate in order

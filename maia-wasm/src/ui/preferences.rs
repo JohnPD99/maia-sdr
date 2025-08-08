@@ -78,7 +78,7 @@ impl_preference_data! {
     spectrometer_sweep_enable: bool = false,
     spectrometer_port_select: u32 = 0,
     spectrometer_freq_profile: u32 = 0,
-    spectrometer_lpf_select: bool = 0,
+    spectrometer_lpf_select: bool = false,
     recording_metadata_filename: String = "recording".to_string(),
     recorder_prepend_timestamp: bool = false,
     recording_metadata_description: String = "".to_string(),

@@ -57,7 +57,7 @@ class Radiometer_control(Elaboratable):
 
             # output the current selection mask correctly
             m.d.comb += [
-                self.rf_sw.eq(Cat(self.lpf_select, self.selection_mask[0:2])),
+                self.rf_sw.eq(Cat(self.selection_mask[0:2], self.lpf_select)),
                 self.gpio_ctl.eq(Cat(0,self.selection_mask[2:])),
             ]
 
