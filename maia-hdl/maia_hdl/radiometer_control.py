@@ -21,29 +21,22 @@ class Radiometer_control(Elaboratable):
         self.gpio_ctl = Signal(4)
         self.sweep_mode = Signal()
         self.port_select = Signal(2)
-        self.freq_select = Signal(4)
+        self.freq_select = Signal(3)
         self.lpf_select = Signal()
-        self.abort = Signal()
+        self.abort = Signal(1, reset=0)
 
         # Internal Signals
         self.selection_mask = Signal(5)
-        self.sweep_mode_synq = Signal()
         self.first = Signal(1, reset=1)
-        
 
 
     def elaborate(self, platform):
         m = Module()
 
-        # need to synchronise sweep mode        
-        m.d.sync += self.sweep_mode_synq.eq(self.sweep_mode)
 
-
-        with m.If(self.sweep_mode_synq):
+        with m.If(self.sweep_mode):
             with m.If(self.clken):
                 with m.If(self.integration_done):
-                    # if an integration is done, we send out an abort (adds ~4096 cycles for antenna switch time and frequency switch)
-                    m.d.sync += self.abort.eq(1)
                     with m.If(self.first):
                         # if it is the very first measurement, we set the selection mask to 0
                         m.d.sync += self.selection_mask.eq(0)
@@ -52,8 +45,7 @@ class Radiometer_control(Elaboratable):
                         # if it is not the first measurement, we increment the selection mask
                         m.d.sync += self.selection_mask.eq(self.selection_mask + 1)
                 with m.Else():
-                    # deselect abort signal (needs to be only one cycle long)
-                    m.d.sync += self.abort.eq(0)
+                    pass
 
             # output the current selection mask correctly
             m.d.comb += [
@@ -65,13 +57,13 @@ class Radiometer_control(Elaboratable):
             
             with m.If(self.clken):
                 m.d.sync += [
-                    self.abort.eq(0),
-                    self.first.eq(1)]
+                    self.first.eq(1),
+                    self.abort.eq(0)]
                 
             # the rf_sw and gpio_ctl are equal to the ones in the sdr registers
             m.d.comb += [
-                self.gpio_ctl.eq(self.freq_select),
-                self.rf_sw.eq(Cat(self.lpf_select, self.port_select)), 
+                self.gpio_ctl.eq(Cat(0,self.freq_select)),
+                self.rf_sw.eq(Cat(self.port_select, self.lpf_select)), 
             ]
             
         return m

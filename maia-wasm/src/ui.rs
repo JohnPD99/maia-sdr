@@ -73,10 +73,12 @@ ui_elements! {
     settings: HtmlDialogElement => Rc<HtmlDialogElement>,
     close_settings: HtmlButtonElement => Rc<HtmlButtonElement>,
     recording_tab: HtmlButtonElement => Rc<HtmlButtonElement>,
+    measurement_tab:HtmlButtonElement => Rc<HtmlButtonElement>,
     waterfall_tab: HtmlButtonElement => Rc<HtmlButtonElement>,
     geolocation_tab: HtmlButtonElement => Rc<HtmlButtonElement>,
     other_tab: HtmlButtonElement => Rc<HtmlButtonElement>,
     recording_panel: HtmlElement => Rc<HtmlElement>,
+    measurement_panel: HtmlElement => Rc<HtmlElement>,
     waterfall_panel: HtmlElement => Rc<HtmlElement>,
     geolocation_panel: HtmlElement => Rc<HtmlElement>,
     other_panel: HtmlElement => Rc<HtmlElement>,
@@ -211,6 +213,7 @@ impl Ui {
             geolocation_update,
             geolocation_clear,
             recording_tab,
+            measurement_tab,
             waterfall_tab,
             geolocation_tab,
             other_tab
@@ -259,7 +262,7 @@ impl Ui {
         Closure::new(move || ui.elements.settings.close())
     }
 
-    impl_tabs!(recording, waterfall, geolocation, other);
+    impl_tabs!(recording, measurement, waterfall, geolocation, other);
 }
 
 // API methods

@@ -76,6 +76,15 @@
             <a id="download_recording" class="link_button" href="/recording" download>Download recording</a>
           </form>
         </div>
+
+         <div id="measurement_panel" class="hidden" role="tabpanel" aria-labelledby="measurement_tab">
+          <form>
+            <label>Start Sweep
+            <input type="checkbox" id="spectrometer_sweep_enable">
+            </label>
+          </form>
+        </div>
+
         <div id="waterfall_panel" class="hidden" role="tabpanel" aria-labelledby="waterfall_tab">
           <form>
             <label for="colormap_select">Colormap</label>
@@ -90,18 +99,6 @@
             <input type="checkbox" id="waterfall_show_spectrum">
           </form>
         </div>
-
-        <div id="measurement_panel" class="hidden" role="tabpanel" aria-labelledby="measurement_tab">
-          <form>
-            <label>Start Sweep
-            <input type="checkbox" id="spectrometer_sweep_enable">
-            </label>
-          </form>
-        </div>
-
-
-
-
         <div id="geolocation_panel" class="hidden" role="tabpanel" aria-labelledby="geolocation_tab">
           <form>
             <div>
@@ -169,9 +166,9 @@
         <label>Port Select
           <select id="spectrometer_port_select">
 	          <option value="0">RS</option>
-	          <option value="1">H</option>
+	          <option value="1">ACS</option>
             <option value="2">V</option>
-            <option value="3">ACS</option>
+            <option value="3">H</option>
           </select>
         </label>
 
