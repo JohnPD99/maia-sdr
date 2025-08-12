@@ -259,7 +259,6 @@ class S1_S2_module(Elaboratable):
         pingpong_q = Signal(reset_less=False)
         do_abort = Signal()
 
-
         # additional signals
         last_fft = Signal(reset_less=True)
         last_fft_delay = Signal(processing_delay-1,reset_less=True) ## The kurtosis module expects the last_fft signal one cycle before the output
@@ -289,12 +288,19 @@ class S1_S2_module(Elaboratable):
                 with m.Else():
                     m.d.sync += last_fft.eq(0)
 
-                with m.If((sum_counter == 1) | (sum_counter == 0) | do_abort):
+                with m.If((sum_counter == 1) | (sum_counter == 0)):
                     # A new sum starts
                     m.d.sync += [
                         sum_counter.eq(1<<self.log2_nint),
                         not_first_sum.eq(0),
                         pingpong.eq(~pingpong),
+                        last_fft.eq(0)
+                    ]
+                
+                with m.If(do_abort):
+                    m.d.sync += [
+                        sum_counter.eq(1<<self.log2_nint),
+                        not_first_sum.eq(0),
                         do_abort.eq(0),
                         last_fft.eq(0)
                     ]
@@ -305,6 +311,7 @@ class S1_S2_module(Elaboratable):
                 do_abort.eq(1),
                 last_fft.eq(0)
             ]
+
 
         m.d.sync += pingpong_q.eq(pingpong_delay[-1])
 

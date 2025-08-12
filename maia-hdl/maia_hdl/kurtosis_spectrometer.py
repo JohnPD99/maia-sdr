@@ -157,7 +157,7 @@ class Kurthosis_Spectrometer(Elaboratable):
             fft.im_in.eq(self.im_in),
 
             integrator.log2_nint.eq(self.log2_number_integrations),
-            integrator.abort.eq(self.abort),
+            integrator.abort.eq(self.abort | control.abort),
             integrator.clken.eq(self.strobe_in),
             integrator.common_edge.eq(self.common_edge_3x),
             integrator.input_last.eq(fft.out_last),
