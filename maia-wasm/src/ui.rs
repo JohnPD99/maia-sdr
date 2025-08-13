@@ -57,6 +57,7 @@ pub struct Ui {
     preferences: Rc<RefCell<preferences::Preferences>>,
     render_engine: Rc<RefCell<RenderEngine>>,
     waterfall: Rc<RefCell<Waterfall>>,
+    freq_profiles_dirty: Rc<Cell<bool>>, // true => must Apply before enabling sweep
 }
 
 // Defines the 'struct Elements' and its constructor
@@ -126,6 +127,20 @@ ui_elements! {
     maia_httpd_version: HtmlSpanElement => Rc<HtmlSpanElement>,
     maia_hdl_version: HtmlSpanElement => Rc<HtmlSpanElement>,
     maia_wasm_version: HtmlSpanElement => Rc<HtmlSpanElement>,
+
+
+    // Frequency profiles: user types MHz; NumberInput converts to Hz (u64)
+    fprofile0: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
+    fprofile1: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
+    fprofile2: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
+    fprofile3: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
+    fprofile4: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
+    fprofile5: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
+    fprofile6: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
+    fprofile7: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
+
+    // Apply button
+    fprofile_apply: HtmlButtonElement => Rc<HtmlButtonElement>,
 }
 
 impl Ui {
@@ -148,6 +163,7 @@ impl Ui {
             preferences,
             render_engine,
             waterfall,
+            freq_profiles_dirty: Rc::new(Cell::new(true)), // must Apply before first sweep
         };
         ui.elements
             .maia_wasm_version
@@ -181,7 +197,6 @@ impl Ui {
             spectrometer_kurt_1,
             spectrometer_kurt_2,
             spectrometer_kurt_enable,
-            spectrometer_sweep_enable,
             spectrometer_port_select,
             spectrometer_lpf_select,
             spectrometer_freq_profile,
@@ -194,12 +209,19 @@ impl Ui {
             geolocation_watch
         );
 
+        let sweep_cb = self.spectrometer_sweep_enable_onchange_guarded();
+        self.elements
+            .spectrometer_sweep_enable
+            .set_onchange(Some(sweep_cb.as_ref().unchecked_ref()));
+        sweep_cb.forget(); // <- prevents “closure invoked after being dropped”
+
+
         // This uses a custom onchange function that calls the macro-generated one.
-        self.elements.ad9361_rx_gain.set_onchange(Some(
-            self.ad9361_rx_gain_onchange_manual()
-                .into_js_value()
-                .unchecked_ref(),
-        ));
+        let rx_gain_cb = self.ad9361_rx_gain_onchange_manual();
+        self.elements
+            .ad9361_rx_gain
+            .set_onchange(Some(rx_gain_cb.as_ref().unchecked_ref()));
+        rx_gain_cb.forget();
 
         set_on!(
             click,
@@ -216,16 +238,30 @@ impl Ui {
             measurement_tab,
             waterfall_tab,
             geolocation_tab,
-            other_tab
+            other_tab,
+            fprofile_apply // <-- add
         );
         self.elements
             .recorder_button_replica
             .set_onclick(self.elements.recorder_button.onclick().as_ref());
 
+
+        let mark_dirty = self.fprofile_mark_dirty_onchange();
+        let f: &js_sys::Function = mark_dirty.as_ref().unchecked_ref();
+        self.elements.fprofile0.set_onchange(Some(f));
+        self.elements.fprofile1.set_onchange(Some(f));
+        self.elements.fprofile2.set_onchange(Some(f));
+        self.elements.fprofile3.set_onchange(Some(f));
+        self.elements.fprofile4.set_onchange(Some(f));
+        self.elements.fprofile5.set_onchange(Some(f));
+        self.elements.fprofile6.set_onchange(Some(f));
+        self.elements.fprofile7.set_onchange(Some(f));
+        mark_dirty.forget(); // <- keep it alive for all eight fields
         Ok(())
     }
 
     fn set_callbacks_post_apply(&self) -> Result<(), JsValue> {
+        self.update_profile_sweep_controls();
         Ok(())
     }
 }
@@ -276,13 +312,16 @@ impl Ui {
                 Ok(JsValue::NULL)
             })
         });
-        let handler_ = handler.into_js_value();
-        let handler: &js_sys::Function = handler_.unchecked_ref();
+
+        let f: &js_sys::Function = handler.as_ref().unchecked_ref();
+
         // call handler immediately
-        handler.call0(&JsValue::NULL)?;
+        f.call0(&JsValue::NULL)?;
         // call handler every interval_ms
         self.window
-            .set_interval_with_callback_and_timeout_and_arguments_0(handler, interval_ms)?;
+            .set_interval_with_callback_and_timeout_and_arguments_0(f, interval_ms)?;
+
+        handler.forget(); // <- keep it alive for the life of the interval
         Ok(())
     }
 
@@ -291,6 +330,7 @@ impl Ui {
         self.api_state.replace(Some(json.clone()));
         self.update_ad9361_inactive_elements(&json.ad9361)?;
         self.update_spectrometer_inactive_elements(&json.spectrometer)?;
+        self.update_profile_sweep_controls();
         self.update_waterfall_rate(&json.spectrometer);
         self.update_kurtosis_label(json.spectrometer.kurt_1, json.spectrometer.kurt_2);
         self.update_recorder_button(&json.recorder);
@@ -933,4 +973,155 @@ impl Ui {
             .borrow_mut()
             .set_waterfall_update_rate(rate);
     }
+}
+
+// Frequency profile logic
+impl Ui {
+    /// Enforce the rules:
+    /// 1) Must Apply before enabling sweep.
+    /// 2) Must turn sweep OFF before applying again.
+    fn update_profile_sweep_controls(&self) {
+        let sweep_on = self.elements.spectrometer_sweep_enable.get().unwrap_or(false);
+        let dirty = self.freq_profiles_dirty.get();
+
+        // Sweep checkbox:
+        //  - Always allow turning OFF (if currently ON).
+        //  - Allow turning ON only if dirty == false.
+        let sweep_should_be_enabled = sweep_on || !dirty;
+        self.elements
+            .spectrometer_sweep_enable
+            .set_disabled(!sweep_should_be_enabled);
+
+        // Apply button:
+        //  - Disabled while sweep is ON (must disengage first per rule 2).
+        //  - Enabled when sweep is OFF.
+        self.elements.fprofile_apply.set_disabled(sweep_on);
+
+        // (Optional) disable inputs while sweeping to make the UX crystal clear:
+        // for input in [&self.elements.fprofile0, &self.elements.fprofile1, &self.elements.fprofile2,
+        //               &self.elements.fprofile3, &self.elements.fprofile4, &self.elements.fprofile5,
+        //               &self.elements.fprofile6, &self.elements.fprofile7] {
+        //     input.set_disabled(sweep_on);
+        // }
+    }
+
+    fn fprofile_mark_dirty_onchange(&self) -> Closure<dyn Fn() -> JsValue> {
+        let ui = self.clone();
+        Closure::new(move || {
+            ui.freq_profiles_dirty.set(true);
+            ui.update_profile_sweep_controls();
+            JsValue::NULL
+        })
+    }
+
+    fn spectrometer_sweep_enable_onchange_guarded(&self) -> Closure<dyn Fn() -> JsValue> {
+        // Macro-generated closure that actually PATCHes sweep_enable
+        let base = self.spectrometer_sweep_enable_onchange();
+        let ui = self.clone();
+
+        Closure::new(move || {
+            let want_on = ui.elements.spectrometer_sweep_enable.get().unwrap_or(false);
+
+            if want_on {
+                // Rule 1: must Apply first
+                if ui.freq_profiles_dirty.get() {
+                    ui.elements.spectrometer_sweep_enable.set(&false); // revert
+                    let _ = ui.alert("Apply frequency profiles first.");
+                    ui.update_profile_sweep_controls();
+                    return JsValue::NULL;
+                }
+                // Allowed: pass through to macro PATCH
+                let rv = base
+                    .as_ref()
+                    .unchecked_ref::<js_sys::Function>()
+                    .call0(&JsValue::NULL)
+                    .unwrap_or(JsValue::NULL);
+                ui.update_profile_sweep_controls(); // now sweep ON; Apply disabled
+                rv
+            } else {
+                // Turning OFF is always allowed
+                let rv = base
+                    .as_ref()
+                    .unchecked_ref::<js_sys::Function>()
+                    .call0(&JsValue::NULL)
+                    .unwrap_or(JsValue::NULL);
+
+                // Rule 2 + “even if unchanged”: force re-Apply before next ON
+                ui.freq_profiles_dirty.set(true);
+                ui.update_profile_sweep_controls(); // sweep OFF; Apply enabled
+                rv
+            }
+        })
+    }
+
+    fn fprofile_apply_onclick(&self) -> Closure<dyn Fn() -> JsValue> {
+        let ui = self.clone();
+        Closure::new(move || {
+            // Rule 2: must disengage sweep before applying
+            if ui.elements.spectrometer_sweep_enable.get().unwrap_or(false) {
+                let _ = ui.alert("Turn off sweep before applying profiles.");
+                return JsValue::NULL;
+            }
+
+            // Read 8 values (Hz) from MHz inputs via MHzPresentation
+            let values_hz: [u64; 8] = match (
+                ui.elements.fprofile0.get(),
+                ui.elements.fprofile1.get(),
+                ui.elements.fprofile2.get(),
+                ui.elements.fprofile3.get(),
+                ui.elements.fprofile4.get(),
+                ui.elements.fprofile5.get(),
+                ui.elements.fprofile6.get(),
+                ui.elements.fprofile7.get(),
+            ) {
+                (Some(v0), Some(v1), Some(v2), Some(v3), Some(v4), Some(v5), Some(v6), Some(v7)) => {
+                    [v0, v1, v2, v3, v4, v5, v6, v7]
+                }
+                _ => {
+                    let _ = ui.alert("Please fill all Frequency Profile fields with valid MHz values.");
+                    return JsValue::NULL;
+                }
+            };
+
+            // PATCH payload (Hz)
+            let payload = serde_json::json!({ "freq_profiles": values_hz });
+            let body = JsValue::from_str(&payload.to_string());
+
+            // Build request
+            let mut init = web_sys::RequestInit::new();
+            init.method("PATCH");
+            init.body(Some(&body));
+            let headers = web_sys::Headers::new().unwrap();
+            headers.set("Content-Type", "application/json").unwrap();
+            init.headers(&headers);
+
+            let request = match web_sys::Request::new_with_str_and_init(SPECTROMETER_URL, &init) {
+                Ok(r) => r,
+                Err(err) => {
+                    web_sys::console::error_2(&"failed to build request".into(), &err);
+                    return JsValue::NULL;
+                }
+            };
+
+            // Send, parse, refresh, clear dirty
+            let ui2 = ui.clone();
+            future_to_promise(async move {
+                let resp_val = JsFuture::from(ui2.window.fetch_with_request(&request)).await?;
+                let resp: Response = resp_val.dyn_into()?;
+                let updated: maia_json::Spectrometer = request::response_to_json(&resp).await?;
+
+                ui2.update_spectrometer_inactive_elements(&updated)?;
+                ui2.update_waterfall_rate(&updated);
+
+                // Apply succeeded: allow enabling sweep (until it’s turned on)
+                ui2.freq_profiles_dirty.set(false);
+                ui2.update_profile_sweep_controls();
+
+                Ok(JsValue::NULL)
+            })
+            .into()
+        })
+    }
+
+
 }

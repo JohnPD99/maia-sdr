@@ -5,7 +5,6 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use tokio::fs;
-
 /// AD9361 IIO device.
 ///
 /// This struct represents the AD9361 IIO device (ad9361-phy) and can be used to
@@ -94,6 +93,25 @@ impl Ad9361 {
         Ad9361GainMode,
         Ad9361GainMode
     );
+
+
+    /// Store current RX LO settings into a fastlock profile slot (0..7).
+    pub async fn rx_fastlock_store(&self, slot: u8) -> Result<()> {
+        // /sys/bus/iio/devices/iio:deviceX/out_altvoltage0_RX_LO_fastlock_store
+        anyhow::ensure!(slot < 8, "fastlock slot must be 0..7, got {slot}");
+        let path = self.iio_device_path.join("out_altvoltage0_RX_LO_fastlock_store");
+        fs::write(path, slot.to_string()).await
+            .context("failed to write RX_LO_fastlock_store")?;
+        Ok(())
+    }
+
+    /// Recall a fastlock profile slot (0..7) for RX LO.
+    pub async fn rx_fastlock_recall(&self, slot: u8) -> Result<()> {
+        let path = self.iio_device_path.join("out_altvoltage0_RX_LO_fastlock_recall");
+        fs::write(path, slot.to_string()).await
+            .context("failed to write RX_LO_fastlock_recall")?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]

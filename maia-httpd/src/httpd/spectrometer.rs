@@ -3,6 +3,8 @@ use crate::app::AppState;
 use anyhow::Result;
 use axum::{Json, extract::State};
 use maia_json::{PatchSpectrometer, Spectrometer};
+use tokio::time::{sleep, Duration};
+
 
 // TODO: do not hardcode FFT size
 const FFT_SIZE: u32 = 4096;
@@ -53,61 +55,106 @@ pub async fn get_spectrometer(
 }
 
 async fn update_spectrometer(state: &AppState, patch: &PatchSpectrometer) -> Result<(), JsonError> {
-    
-    let mut ip_core = state.ip_core().lock().unwrap();
+    // 1) Program fastlock profiles if provided
+    if let Some(freqs) = patch.freq_profiles {
+        let ad = state.ad9361().lock().await;
 
-    if let Some(n) = patch.integrations_exp {
-        ip_core
-            .set_spectrometer_integrations_exp(n)
-            .map_err(JsonError::client_error)?;
+        for (slot, &f_hz) in freqs.iter().enumerate() {
+            ad.set_rx_lo_frequency(f_hz)
+                .await
+                .map_err(JsonError::server_error)?;
+
+            // Wait for PLL to settle a bit before storing
+            sleep(Duration::from_millis(10)).await;
+
+            ad.rx_fastlock_store(slot as u8)
+                .await
+                .map_err(JsonError::server_error)?;
+        }
+
+        // After programming, recall slot 0 (like your shell script)
+        ad.rx_fastlock_recall(0)
+            .await
+            .map_err(JsonError::server_error)?;
     }
 
-    if let Some(k1) = patch.kurt_1 {
-        ip_core
-            .set_spectrometer_kurt_1(k1)
-            .map_err(JsonError::client_error)?;
-    }
+    // 2) If sweep is being turned ON in this PATCH, decide which slot we’ll recall
+    //    (we'll do the actual recall AFTER dropping the ip_core lock).
+    let slot_to_recall: Option<u8> = match patch.sweep_enable {
+        Some(true) => {
+            // If the PATCH also sets freq_profile, prefer that; otherwise use the current one.
+            let slot = patch.freq_profile.unwrap_or_else(|| {
+                state.ip_core().lock().unwrap().spectrometer_freq_profile()
+            }) as u8;
+            Some(slot)
+        }
+        _ => None,
+    };
 
-    if let Some(k2) = patch.kurt_2 {
-        ip_core
-            .set_spectrometer_kurt_2(k2)
-            .map_err(JsonError::client_error)?;
-    }
+    // 3) Apply all non-async IP-core changes under a single, short lock scope
+    {
+        let mut ip_core = state.ip_core().lock().unwrap();
 
-    if let Some(ken) = patch.kurt_enable {
-        ip_core
-            .set_spectrometer_kurt_enable(ken)
-            .map_err(JsonError::client_error)?;
-    }
-    
-    if let Some(sen) = patch.sweep_enable {
-    ip_core
-        .set_spectrometer_sweep_enable(sen)
-        .map_err(JsonError::client_error)?;
-    }
+        if let Some(n) = patch.integrations_exp {
+            ip_core
+                .set_spectrometer_integrations_exp(n)
+                .map_err(JsonError::client_error)?;
+        }
 
-    if let Some(pse) = patch.port_select {
-    ip_core
-        .set_spectrometer_port_select(pse)
-        .map_err(JsonError::client_error)?;
-    }
+        if let Some(k1) = patch.kurt_1 {
+            ip_core
+                .set_spectrometer_kurt_1(k1)
+                .map_err(JsonError::client_error)?;
+        }
 
-     
-    if let Some(fp) = patch.freq_profile {
-    ip_core
-        .set_spectrometer_freq_profile(fp)
-        .map_err(JsonError::client_error)?;
-    }
+        if let Some(k2) = patch.kurt_2 {
+            ip_core
+                .set_spectrometer_kurt_2(k2)
+                .map_err(JsonError::client_error)?;
+        }
 
-    if let Some(lse) = patch.lpf_select {
-    ip_core
-        .set_spectrometer_lpf_select(lse)
-        .map_err(JsonError::client_error)?;
-    }
+        if let Some(ken) = patch.kurt_enable {
+            ip_core
+                .set_spectrometer_kurt_enable(ken)
+                .map_err(JsonError::client_error)?;
+        }
 
+        if let Some(sen) = patch.sweep_enable {
+            ip_core
+                .set_spectrometer_sweep_enable(sen)
+                .map_err(JsonError::client_error)?;
+        }
+
+        if let Some(pse) = patch.port_select {
+            ip_core
+                .set_spectrometer_port_select(pse)
+                .map_err(JsonError::client_error)?;
+        }
+
+        if let Some(fp) = patch.freq_profile {
+            ip_core
+                .set_spectrometer_freq_profile(fp)
+                .map_err(JsonError::client_error)?;
+        }
+
+        if let Some(lse) = patch.lpf_select {
+            ip_core
+                .set_spectrometer_lpf_select(lse)
+                .map_err(JsonError::client_error)?;
+        }
+    } // <- ip_core mutex dropped here
+
+    // 4) If sweep was turned ON, recall the chosen fastlock slot now (no root/pincontrol writes)
+    if let Some(slot) = slot_to_recall {
+        let ad = state.ad9361().lock().await;
+        if let Err(e) = ad.rx_fastlock_recall(slot).await {
+            tracing::warn!("fastlock recall on sweep enable (slot {slot}) failed: {e:#}");
+        }
+    }
 
     Ok(())
 }
+
 
 pub async fn patch_spectrometer(
     State(state): State<AppState>,

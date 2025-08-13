@@ -219,9 +219,14 @@ pub struct PatchSpectrometer {
     /// port selection
     #[serde(skip_serializing_if = "Option::is_none")]
     pub port_select: Option<u32>,
-    /// Ffrequency profile selection
+    /// Frequency profile selection
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub freq_profile: Option<u32>
+    pub freq_profile: Option<u32>,
+    /// Frequency profiles (Hz) to program into AD9361 fastlock slots 0..7.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub freq_profiles: Option<[u64; 8]>
+
+
     
     
 }
