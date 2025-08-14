@@ -893,6 +893,7 @@ pub mod maia_sdr {
         recorder_next_address: RecorderNextAddress,
         _reserved6: [u8; 0x08],
         spectrometer: Spectrometer,
+        spectrometer2: Spectrometer2,
     }
     impl RegisterBlock {
         #[doc = "0x00 - product_id"]
@@ -929,6 +930,11 @@ pub mod maia_sdr {
         #[inline(always)]
         pub const fn spectrometer(&self) -> &Spectrometer {
             &self.spectrometer
+        }
+        #[doc = "0x24 - spectrometer2"]
+        #[inline(always)]
+        pub const fn spectrometer2(&self) -> &Spectrometer2 {
+            &self.spectrometer2
         }
     }
     #[doc = "product_id (r) register accessor: product_id\n\nYou can [`read`](crate::Reg::read) this register and get [`product_id::R`]. See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [`mod@product_id`] module"]
@@ -1304,6 +1310,30 @@ pub mod maia_sdr {
         impl crate::Writable for SpectrometerSpec {
             type Safety = crate::Unsafe;
         }
+    }
+    #[doc = "spectrometer2 (r) register accessor: spectrometer2\n\nYou can [`read`](crate::Reg::read) this register and get [`spectrometer2::R`]. See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [`mod@spectrometer2`] module"]
+    #[doc(alias = "spectrometer2")]
+    pub type Spectrometer2 = crate::Reg<spectrometer2::Spectrometer2Spec>;
+    #[doc = "spectrometer2"]
+    pub mod spectrometer2 {
+        #[doc = "Register `spectrometer2` reader"]
+        pub type R = crate::R<Spectrometer2Spec>;
+        #[doc = "Field `sweep_cnt` reader - Current sweep step (0..31)"]
+        pub type SweepCntR = crate::FieldReader;
+        impl R {
+            #[doc = "Bits 0:6 - Current sweep step (0..31)"]
+            #[inline(always)]
+            pub fn sweep_cnt(&self) -> SweepCntR {
+                SweepCntR::new((self.bits & 0x7f) as u8)
+            }
+        }
+        #[doc = "spectrometer2\n\nYou can [`read`](crate::Reg::read) this register and get [`spectrometer2::R`](R). See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+        pub struct Spectrometer2Spec;
+        impl crate::RegisterSpec for Spectrometer2Spec {
+            type Ux = u32;
+        }
+        #[doc = "`read()` method returns [`spectrometer2::R`](R) reader structure"]
+        impl crate::Readable for Spectrometer2Spec {}
     }
 }
 #[no_mangle]

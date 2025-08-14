@@ -566,7 +566,13 @@ class TRTSDR(Elaboratable):
                         Field('sweep_enable',
                               Access.RW,
                               1,
-                              0)
+                              0),
+                    ]),
+                
+                0b1: Register(
+                    'spectrometer2', 
+                    [
+                        Field('sweep_cnt', Access.R, 7, 0),
                     ]),
                 
             }, 1)
@@ -784,6 +790,9 @@ class TRTSDR(Elaboratable):
         # Preliminary pin control
         m.d.comb += self.gpio_ctl.eq(self.spectrometer.gpio_ctl)
         m.d.comb += self.rf_sw.eq(self.spectrometer.rf_sw)
+
+        # sweep_cnt 
+        m.d.comb +=  self.sdr_registers['spectrometer2']['sweep_cnt'].eq(Cat(self.rf_sw, self.gpio_ctl))
 
         return m
 

@@ -215,6 +215,8 @@ impl IpCore {
             .kurt_enable()
             .bit()
             .into();
+
+        
         
         let interrupt_handler = InterruptHandler::new(uio, interrupt_registers);
         Ok((ip_core, interrupt_handler))
@@ -600,6 +602,15 @@ impl IpCore {
     /// the size of the recording.
     pub fn recorder_next_address(&self) -> usize {
         usize::try_from(self.registers.recorder_next_address().read().bits()).unwrap()
+    }
+
+    /// Returns the current sweep step (FPGA-provided), 0..31 (or up to 0..127 if you widen).
+    pub fn spectrometer_sweep_cnt(&self) -> u8 {
+        self.registers
+            .spectrometer2()
+            .read()
+            .sweep_cnt()
+            .bits()
     }
 }
 

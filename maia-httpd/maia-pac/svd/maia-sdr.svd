@@ -208,11 +208,26 @@
               <bitRange>[30:28]</bitRange>
               <access>read-write</access>
             </field>
-             <field>
+            <field>
               <name>sweep_enable</name>
               <description>sweep_enable</description>
               <bitRange>[31:31]</bitRange>
               <access>read-write</access>
+            </field>
+          </fields>
+        </register>
+        <!-- NEW register right after spectrometer (0x20) -->
+        <register>
+          <name>spectrometer2</name>
+          <description>spectrometer2</description>
+          <addressOffset>0x24</addressOffset>
+          <access>read-only</access>
+          <fields>
+            <field>
+              <name>sweep_cnt</name>
+              <description>Current sweep step (0..31)</description>
+              <bitRange>[6:0]</bitRange>
+              <access>read-only</access>
             </field>
           </fields>
         </register>

@@ -4,6 +4,7 @@
 //! SDR FPGA IP core.
 
 use crate::{app::AppState, fpga::InterruptWaiter};
+use crate::telemetry::Telemetry;                 // <-- added
 use anyhow::Result;
 use bytes::Bytes;
 use std::sync::Mutex;
@@ -22,6 +23,7 @@ pub struct Spectrometer {
     state: AppState,
     sender: broadcast::Sender<Bytes>,
     interrupt: InterruptWaiter,
+    telemetry: Telemetry,                          // <-- added
 }
 
 /// Spectrometer configuration setter.
@@ -47,11 +49,13 @@ impl Spectrometer {
         state: AppState,
         interrupt: InterruptWaiter,
         sender: broadcast::Sender<Bytes>,
+        telemetry: Telemetry,                      // <-- added
     ) -> Spectrometer {
         Spectrometer {
             state,
             interrupt,
             sender,
+            telemetry,                             // <-- added
         }
     }
 
@@ -87,38 +91,43 @@ impl Spectrometer {
                 sweep_enable,
                 lpf_select,
                 port_select,
-                freq_profile
+                freq_profile,
+                sweep_cnt = ip_core.spectrometer_sweep_cnt(), // <- optional
             );
             // TODO: potential optimization: do not hold the mutex locked while
             // we iterate over the buffers.
+
+            let sweep_cnt = ip_core.spectrometer_sweep_cnt();
+
+
             for buffer in ip_core.get_spectrometer_buffers() {
                 if self.sender.receiver_count() > 0 {
-                    // It is ok if send returns Err, because there might be
-                    // no receiver handles in this moment.
-                    let _ = self.sender.send(Self::buffer_u64fp_to_f32(buffer, scale));
+                    // Convert 4096 bins -> f32 -> bytesW
+                    let mut payload = Self::buffer_u64fp_to_f32(buffer, scale);
+
+                    let mut footer = self.telemetry.footer_bytes();
+                    footer[6] = sweep_cnt; // mask to 0..31 if that’s your range
+                    footer[7] = 0;
+
+                    // Append footer
+                    payload.extend_from_slice(&footer);
+
+                    // Broadcast (ignore Err if no receivers)
+                    let _ = self.sender.send(Bytes::from(payload));
                 }
             }
         }
     }
 
-    fn buffer_u64fp_to_f32(buffer: &[u64], scale: f32) -> Bytes {
-        // The spectrometer output is in "floating point" format with an
-        // exponent that occupies the 8 MSBs of the 64 value and represents
-        // powers of 4, and a mantissa that occupies the LSBs. The way to parse
-        // this representation is to separate the exponent and the mantissa and
-        // to shift left the mantissa by 2 times the exponent places.
-
-        // TODO: optimize using Neon
-        buffer
-            .iter()
-            .flat_map(|&x| {
-                let exponent = (x >> 56) as u8;
-                let value = x & ((1u64 << 56) - 1);
-                let y = value << (2 * exponent);
-                let z = y as f32 * scale;
-                z.to_ne_bytes().into_iter()
-            })
-            .collect()
+    fn buffer_u64fp_to_f32(buffer: &[u64], scale: f32) -> Vec<u8> {
+        let mut out = Vec::with_capacity(buffer.len() * 4); // 4096 bins * 4 bytes
+        for &x in buffer {
+            let exponent = (x >> 56) as u8;
+            let value = x & ((1u64 << 56) - 1);
+            let y = value << (2 * exponent);
+            out.extend_from_slice(&(y as f32 * scale).to_ne_bytes());
+        }
+        out
     }
 }
 

@@ -10,6 +10,7 @@ use crate::{
     httpd::{self, RecorderFinishWaiter, RecorderState},
     iio::Ad9361,
     spectrometer::{Spectrometer, SpectrometerConfig},
+    telemetry::Telemetry,
 };
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
@@ -25,6 +26,7 @@ pub struct App {
     interrupt_handler: InterruptHandler,
     recorder_finish: RecorderFinishWaiter,
     spectrometer: Spectrometer,
+    telemetry:Telemetry
 }
 
 impl App {
@@ -48,11 +50,15 @@ impl App {
 
         // Build application objects
 
+        let telemetry = Telemetry::new();
+        telemetry.spawn_inputs("/dev/ttyPS0", 9600, "/dev/i2c-1", 0x48, 0x49, 20);
+        
         let (waterfall_sender, _) = broadcast::channel(16);
         let spectrometer = Spectrometer::new(
             state.clone(),
             interrupt_handler.waiter_spectrometer(),
             waterfall_sender.clone(),
+            telemetry.clone(),   
         );
 
         let recorder_finish =
@@ -74,6 +80,7 @@ impl App {
             interrupt_handler,
             recorder_finish,
             spectrometer,
+            telemetry,  
         })
     }
 

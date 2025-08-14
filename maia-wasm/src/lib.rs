@@ -52,16 +52,16 @@ pub fn maia_wasm_start() -> Result<(), JsValue> {
             .dyn_into::<web_sys::HtmlCanvasElement>()?,
     );
 
-    let (render_engine, waterfall, mut waterfall_interaction) =
-        new_waterfall(&window, &document, &canvas)?;
-    WebSocketClient::start(&window, Rc::clone(&waterfall))?;
+    let (render_engine, waterfall, mut waterfall_interaction) = new_waterfall(&window, &document, &canvas)?;
     let ui = Ui::new(
         Rc::clone(&window),
         Rc::clone(&document),
         Rc::clone(&render_engine),
         Rc::clone(&waterfall),
     )?;
+    WebSocketClient::start(&window, Rc::clone(&waterfall), ui.clone())?;
     waterfall_interaction.set_ui(ui);
+
 
     setup_render_loop(render_engine, waterfall);
 

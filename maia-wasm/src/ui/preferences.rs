@@ -75,7 +75,6 @@ impl_preference_data! {
     spectrometer_kurt_1: u32 = 1,
     spectrometer_kurt_2: u32 = 2,
     spectrometer_kurt_enable: bool = true,
-    spectrometer_sweep_enable: bool = false,
     spectrometer_port_select: u32 = 0,
     spectrometer_freq_profile: u32 = 0,
     spectrometer_lpf_select: bool = false,

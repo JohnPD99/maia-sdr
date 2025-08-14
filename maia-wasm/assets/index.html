@@ -113,9 +113,7 @@
             </label>
             <button id="fprofile_apply" type="button">Apply</button>
             
-            <label>Perform Sweep
-            <input type="checkbox" id="spectrometer_sweep_enable">
-            </label>
+            <button id="sweep_button" type="button" class="sweep_off">Start Sweep</button>
           </form>
         </div>
 
@@ -154,7 +152,25 @@
     </dialog>
 
     <div class="main_screen">
-      <canvas id="canvas"></canvas>
+    
+      <div id="waterfall_wrap">
+        <canvas id="canvas"></canvas>
+
+        <!-- Telemetry overlay (top-right over the canvas) -->
+        <div id="telemetry_overlay" aria-live="off">
+          <div class="row gps">
+            <span class="label">GPS</span>
+            <span id="tele_gps_lat">—</span>,
+            <span id="tele_gps_lon">—</span>,
+            <span id="tele_gps_alt">—</span>
+          </div>
+          <div class="row temps">
+            <span class="label">T1</span> <span id="tele_temp0">—</span>
+            &nbsp;·&nbsp;
+            <span class="label">T2</span> <span id="tele_temp1">—</span>
+          </div>
+        </div>
+      </div>
 
       <form class="ui">
         <fieldset class="waterfall_levels">
@@ -216,10 +232,6 @@
         <label>Frequency Profile Selection
           <input type="number" id="spectrometer_freq_profile" step="1" min="0">
         </label>
-
-
-
-
         <button type="button" id="recorder_button" class="record_button"></button>
         <button type="button" id="settings_button">Settings</button>
       </form>

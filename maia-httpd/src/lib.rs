@@ -11,6 +11,7 @@ pub mod args;
 //pub mod ddc;
 pub mod fpga;
 pub mod httpd;
+pub mod telemetry;
 pub mod iio;
 pub mod rxbuffer;
 pub mod sigmf;

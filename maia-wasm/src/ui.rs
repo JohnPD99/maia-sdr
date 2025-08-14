@@ -102,8 +102,6 @@ ui_elements! {
     spectrometer_kurt_thresh: HtmlSpanElement => Rc<HtmlSpanElement>,
     spectrometer_kurt_enable: HtmlInputElement
         => CheckboxInput,
-    spectrometer_sweep_enable: HtmlInputElement
-        => CheckboxInput,
     spectrometer_port_select: HtmlSelectElement 
         => EnumInput<u32>,
     spectrometer_lpf_select: HtmlSelectElement 
@@ -128,6 +126,8 @@ ui_elements! {
     maia_hdl_version: HtmlSpanElement => Rc<HtmlSpanElement>,
     maia_wasm_version: HtmlSpanElement => Rc<HtmlSpanElement>,
 
+    sweep_button: HtmlButtonElement => Rc<HtmlButtonElement>,
+
 
     // Frequency profiles: user types MHz; NumberInput converts to Hz (u64)
     fprofile0: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
@@ -141,6 +141,14 @@ ui_elements! {
 
     // Apply button
     fprofile_apply: HtmlButtonElement => Rc<HtmlButtonElement>,
+
+    // Telemetry overlay (HTML spans you added in the page)
+    tele_gps_lat: HtmlSpanElement => Rc<HtmlSpanElement>,
+    tele_gps_lon: HtmlSpanElement => Rc<HtmlSpanElement>,
+    tele_gps_alt: HtmlSpanElement => Rc<HtmlSpanElement>,
+    tele_temp0:   HtmlSpanElement => Rc<HtmlSpanElement>,
+    tele_temp1:   HtmlSpanElement => Rc<HtmlSpanElement>,
+
 }
 
 impl Ui {
@@ -209,11 +217,6 @@ impl Ui {
             geolocation_watch
         );
 
-        let sweep_cb = self.spectrometer_sweep_enable_onchange_guarded();
-        self.elements
-            .spectrometer_sweep_enable
-            .set_onchange(Some(sweep_cb.as_ref().unchecked_ref()));
-        sweep_cb.forget(); // <- prevents “closure invoked after being dropped”
 
 
         // This uses a custom onchange function that calls the macro-generated one.
@@ -239,7 +242,8 @@ impl Ui {
             waterfall_tab,
             geolocation_tab,
             other_tab,
-            fprofile_apply // <-- add
+            fprofile_apply, // <-- add
+            sweep_button          // <-- add this
         );
         self.elements
             .recorder_button_replica
@@ -283,14 +287,18 @@ impl Ui {
 // Settings
 impl Ui {
     fn settings_button_onclick(&self) -> Closure<dyn Fn()> {
-        let ui = self.clone();
-        Closure::new(move || {
-            if ui.elements.settings.open() {
-                ui.elements.settings.close();
-            } else {
-                ui.elements.settings.show();
-            }
-        })
+            let ui = self.clone();
+            Closure::new(move || {
+                if ui.elements.settings.open() {
+                    ui.elements.settings.close();
+                } else {
+                    if let Err(err) = ui.elements.settings.show_modal() {
+                        // Fallback + log if modal fails (older browsers)
+                        web_sys::console::error_2(&"dialog.showModal() failed".into(), &err);
+                        ui.elements.settings.show();
+                    }
+                }
+            })
     }
 
     fn close_settings_onclick(&self) -> Closure<dyn Fn()> {
@@ -847,9 +855,8 @@ impl Ui {
         kurt_enable,
         port_select,
         lpf_select,
-        freq_profile,
-        sweep_enable
-        
+        freq_profile       
+        //sweep_enable
     );
 
     // This function fakes an onchange event for the spectrometer_rate in order
@@ -975,35 +982,93 @@ impl Ui {
     }
 }
 
+
+impl Ui {
+    /// Parse the 32-byte telemetry footer (TLM1 v1) and update the overlay labels.
+    /// Call this from wherever you handle each waterfall frame, passing the
+    /// *last 32 bytes* of the binary payload.
+    pub fn apply_telemetry_footer(&self, footer: &[u8]) {
+        // Expect exactly 32 bytes
+        if footer.len() != 32 { return; }
+        if &footer[0..4] != b"TLM1" { return; }
+        if footer[4] != 1 { return; } // version
+
+        let flags      = footer[5];
+        let gps_valid  = (flags & 0x01) != 0;
+        let t_valid    = (flags & 0x02) != 0;
+
+        // Little-endian helpers
+        let le_i16 = |i: usize| i16::from_le_bytes([footer[i], footer[i+1]]);
+        let le_i32 = |i: usize| i32::from_le_bytes([footer[i], footer[i+1], footer[i+2], footer[i+3]]);
+        let le_i64 = |i: usize| i64::from_le_bytes([
+            footer[i], footer[i+1], footer[i+2], footer[i+3],
+            footer[i+4], footer[i+5], footer[i+6], footer[i+7]
+        ]);
+
+        // Temps: centi-°C
+        if t_valid {
+            let t0_c = le_i16(8)  as f32 / 100.0;
+            let t1_c = le_i16(10) as f32 / 100.0;
+            self.elements.tele_temp0.set_text_content(Some(&format!("{t0_c:.2} °C")));
+            self.elements.tele_temp1.set_text_content(Some(&format!("{t1_c:.2} °C")));
+        } else {
+            self.elements.tele_temp0.set_text_content(Some("—"));
+            self.elements.tele_temp1.set_text_content(Some("—"));
+        }
+
+        // GPS: lat/lon in deg*1e7, alt in mm
+        if gps_valid {
+            let lat = le_i32(12) as f64 / 1e7;
+            let lon = le_i32(16) as f64 / 1e7;
+            let alt_m = le_i32(20) as f64 / 1000.0;
+            // let _unix_ms = le_i64(24); // available if you want it
+
+            let lat_s = format!("{:.6}°{}", lat.abs(), if lat >= 0.0 { "N" } else { "S" });
+            let lon_s = format!("{:.6}°{}", lon.abs(), if lon >= 0.0 { "E" } else { "W" });
+            let alt_s = format!("{:.1} m", alt_m);
+
+            self.elements.tele_gps_lat.set_text_content(Some(&lat_s));
+            self.elements.tele_gps_lon.set_text_content(Some(&lon_s));
+            self.elements.tele_gps_alt.set_text_content(Some(&alt_s));
+        } else {
+            self.elements.tele_gps_lat.set_text_content(Some("—"));
+            self.elements.tele_gps_lon.set_text_content(Some("—"));
+            self.elements.tele_gps_alt.set_text_content(Some("—"));
+        }
+    }
+}
+
 // Frequency profile logic
 impl Ui {
     /// Enforce the rules:
     /// 1) Must Apply before enabling sweep.
     /// 2) Must turn sweep OFF before applying again.
     fn update_profile_sweep_controls(&self) {
-        let sweep_on = self.elements.spectrometer_sweep_enable.get().unwrap_or(false);
+        let sweep_on = self
+            .api_state
+            .borrow()
+            .as_ref()
+            .map(|st| st.spectrometer.sweep_enable)
+            .unwrap_or(false);
+
         let dirty = self.freq_profiles_dirty.get();
 
-        // Sweep checkbox:
-        //  - Always allow turning OFF (if currently ON).
-        //  - Allow turning ON only if dirty == false.
-        let sweep_should_be_enabled = sweep_on || !dirty;
+        // Button label + look
         self.elements
-            .spectrometer_sweep_enable
-            .set_disabled(!sweep_should_be_enabled);
+            .sweep_button
+            .set_text_content(Some(if sweep_on { "Stop Sweep" } else { "Start Sweep" }));
+        self.elements
+            .sweep_button
+            .set_class_name(if sweep_on { "sweep_on" } else { "sweep_off" });
 
-        // Apply button:
-        //  - Disabled while sweep is ON (must disengage first per rule 2).
-        //  - Enabled when sweep is OFF.
+        // Rule 1: Can only enable when not dirty; stopping is always allowed.
+        // → Disable button only in the “would turn ON, but dirty” case.
+        self.elements.sweep_button.set_disabled(!sweep_on && dirty);
+
+        // Rule 2: Apply disabled while sweeping
         self.elements.fprofile_apply.set_disabled(sweep_on);
-
-        // (Optional) disable inputs while sweeping to make the UX crystal clear:
-        // for input in [&self.elements.fprofile0, &self.elements.fprofile1, &self.elements.fprofile2,
-        //               &self.elements.fprofile3, &self.elements.fprofile4, &self.elements.fprofile5,
-        //               &self.elements.fprofile6, &self.elements.fprofile7] {
-        //     input.set_disabled(sweep_on);
-        // }
     }
+
 
     fn fprofile_mark_dirty_onchange(&self) -> Closure<dyn Fn() -> JsValue> {
         let ui = self.clone();
@@ -1014,51 +1079,88 @@ impl Ui {
         })
     }
 
-    fn spectrometer_sweep_enable_onchange_guarded(&self) -> Closure<dyn Fn() -> JsValue> {
-        // Macro-generated closure that actually PATCHes sweep_enable
-        let base = self.spectrometer_sweep_enable_onchange();
+    fn sweep_button_onclick(&self) -> wasm_bindgen::closure::Closure<dyn Fn() -> JsValue> {
         let ui = self.clone();
-
         Closure::new(move || {
-            let want_on = ui.elements.spectrometer_sweep_enable.get().unwrap_or(false);
+            // Current sweep state from the last /api snapshot
+            let sweep_on = ui
+                .api_state
+                .borrow()
+                .as_ref()
+                .map(|st| st.spectrometer.sweep_enable)
+                .unwrap_or(false);
 
-            if want_on {
-                // Rule 1: must Apply first
+            if !sweep_on {
+                // Turning ON: must have applied profiles first
                 if ui.freq_profiles_dirty.get() {
-                    ui.elements.spectrometer_sweep_enable.set(&false); // revert
                     let _ = ui.alert("Apply frequency profiles first.");
-                    ui.update_profile_sweep_controls();
                     return JsValue::NULL;
                 }
-                // Allowed: pass through to macro PATCH
-                let rv = base
-                    .as_ref()
-                    .unchecked_ref::<js_sys::Function>()
-                    .call0(&JsValue::NULL)
-                    .unwrap_or(JsValue::NULL);
-                ui.update_profile_sweep_controls(); // now sweep ON; Apply disabled
-                rv
+
+                // Optional optimistic UI
+                ui.elements.sweep_button.set_text_content(Some("Starting…"));
+                ui.elements.sweep_button.set_disabled(true);
+
+                // PATCH sweep_enable: true
+                let ui2 = ui.clone();
+                future_to_promise(async move {
+                    let patch = maia_json::PatchSpectrometer { sweep_enable: Some(true), ..Default::default() };
+                    if let Some(updated) = request::ignore_request_failed(ui2.patch_spectrometer(&patch).await)? {
+                        // Keep local state in sync so the label/disabled rules are correct
+                        if let Some(state) = ui2.api_state.borrow_mut().as_mut() {
+                            state.spectrometer = updated.clone();
+                        }
+                        ui2.update_spectrometer_inactive_elements(&updated)?;
+                        ui2.update_profile_sweep_controls();
+                    } else {
+                        // Request failed or ignored → revert UI
+                        ui2.update_profile_sweep_controls();
+                    }
+                    Ok(JsValue::NULL)
+                })
+                .into()
             } else {
                 // Turning OFF is always allowed
-                let rv = base
-                    .as_ref()
-                    .unchecked_ref::<js_sys::Function>()
-                    .call0(&JsValue::NULL)
-                    .unwrap_or(JsValue::NULL);
+                ui.elements.sweep_button.set_text_content(Some("Stopping…"));
+                ui.elements.sweep_button.set_disabled(true);
 
-                // Rule 2 + “even if unchanged”: force re-Apply before next ON
-                ui.freq_profiles_dirty.set(true);
-                ui.update_profile_sweep_controls(); // sweep OFF; Apply enabled
-                rv
+                let ui2 = ui.clone();
+                future_to_promise(async move {
+                    let patch = maia_json::PatchSpectrometer { sweep_enable: Some(false), ..Default::default() };
+                    if let Some(updated) = request::ignore_request_failed(ui2.patch_spectrometer(&patch).await)? {
+                        if let Some(state) = ui2.api_state.borrow_mut().as_mut() {
+                            state.spectrometer = updated.clone();
+                        }
+                        // Rule 2: require re-Apply before the next ON
+                        ui2.freq_profiles_dirty.set(true);
+
+                        ui2.update_spectrometer_inactive_elements(&updated)?;
+                        ui2.update_profile_sweep_controls();
+                    } else {
+                        ui2.update_profile_sweep_controls();
+                    }
+                    Ok(JsValue::NULL)
+                })
+                .into()
             }
         })
     }
+
+
+   
 
     fn fprofile_apply_onclick(&self) -> Closure<dyn Fn() -> JsValue> {
         let ui = self.clone();
         Closure::new(move || {
             // Rule 2: must disengage sweep before applying
-            if ui.elements.spectrometer_sweep_enable.get().unwrap_or(false) {
+            let sweep_on = ui
+                .api_state
+                .borrow()
+                .as_ref()
+                .map(|st| st.spectrometer.sweep_enable)
+                .unwrap_or(false);
+
+            if sweep_on {
                 let _ = ui.alert("Turn off sweep before applying profiles.");
                 return JsValue::NULL;
             }
