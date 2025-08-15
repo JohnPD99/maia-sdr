@@ -424,3 +424,5 @@ input.gain {
     justify-self: start;
 }
 
+.sweep_row { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#sweep_output_path { min-width: 16rem; }

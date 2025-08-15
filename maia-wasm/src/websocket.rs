@@ -9,6 +9,8 @@ use web_sys::{CloseEvent, MessageEvent, WebSocket, Window};
 
 use crate::waterfall::Waterfall;
 use crate::ui::Ui; // <-- added
+use crate::file_writer::SaveTarget;
+use wasm_bindgen_futures::spawn_local; // add this
 
 /// WebSocket client for waterfall data.
 ///
@@ -42,8 +44,15 @@ impl WebSocketClient {
         let protocol = if location.protocol()? == "https:" { "wss" } else { "ws" };
         let hostname = location.hostname()?;
         let port = location.port()?;
+        
+        
+        let url = if port.is_empty() {
+            format!("{protocol}://{hostname}/waterfall")
+        } else {
+            format!("{protocol}://{hostname}:{port}/waterfall")
+        };
         let data = Rc::new(WebSocketData {
-            url: format!("{protocol}://{hostname}:{port}/waterfall"),
+            url,
             onmessage: onmessage(waterfall, ui).into_js_value(), // <-- pass ui
             onclose: RefCell::new(None),
         });
@@ -87,6 +96,24 @@ fn onmessage(
         // Spectrum view: first 4096 floats
         let f32_view = js_sys::Float32Array::new(&abuf).subarray(0, BINS as u32);
         waterfall.borrow_mut().put_waterfall_spectrum(&f32_view);
+
+        // If recording is enabled, append this frame to disk (non-blocking)
+        if ui.is_recording_enabled() {
+            // copy out of the JS view
+            let mut frame = vec![0f32; BINS];
+            f32_view.copy_to(&mut frame[..]);
+
+            // clone a sink object WITHOUT holding a RefCell borrow across .await
+            if let Some(sink_obj) = ui.clone_file_sink() {
+                spawn_local(async move {
+                    if let Err(e) = SaveTarget::write_frame_with_sink(sink_obj, &frame).await {
+                        web_sys::console::error_1(&e);
+                    }
+                });
+            }
+        }
+
+
 
         // Optional 32-byte footer: last bytes
         if total == BYTES_BINS + FOOTER {

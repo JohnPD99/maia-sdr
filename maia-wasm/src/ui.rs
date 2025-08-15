@@ -11,12 +11,14 @@ use std::{
     rc::Rc,
 };
 use wasm_bindgen::{JsCast, JsValue, closure::Closure};
-use wasm_bindgen_futures::{JsFuture, future_to_promise};
+use wasm_bindgen_futures::{JsFuture, future_to_promise, spawn_local};
 use web_sys::{
     Document, Geolocation, HtmlButtonElement, HtmlDialogElement, HtmlElement, HtmlInputElement,
     HtmlParagraphElement, HtmlSelectElement, HtmlSpanElement, PositionOptions, Response, Window,
 };
 
+
+use crate::file_writer::SaveTarget;                                    // new
 use crate::render::RenderEngine;
 use crate::waterfall::Waterfall;
 
@@ -58,6 +60,7 @@ pub struct Ui {
     render_engine: Rc<RefCell<RenderEngine>>,
     waterfall: Rc<RefCell<Waterfall>>,
     freq_profiles_dirty: Rc<Cell<bool>>, // true => must Apply before enabling sweep
+    file_save: Rc<RefCell<SaveTarget>>, // new: holds the file handle/stream + enabled flag
 }
 
 // Defines the 'struct Elements' and its constructor
@@ -149,6 +152,10 @@ ui_elements! {
     tele_temp0:   HtmlSpanElement => Rc<HtmlSpanElement>,
     tele_temp1:   HtmlSpanElement => Rc<HtmlSpanElement>,
 
+
+    sweep_output_path: HtmlInputElement => TextInput,
+    sweep_browse: HtmlButtonElement => Rc<HtmlButtonElement>,
+
 }
 
 impl Ui {
@@ -172,6 +179,7 @@ impl Ui {
             render_engine,
             waterfall,
             freq_profiles_dirty: Rc::new(Cell::new(true)), // must Apply before first sweep
+            file_save: Rc::new(RefCell::new(SaveTarget::new())),
         };
         ui.elements
             .maia_wasm_version
@@ -243,7 +251,8 @@ impl Ui {
             geolocation_tab,
             other_tab,
             fprofile_apply, // <-- add
-            sweep_button          // <-- add this
+            sweep_button,          // <-- add this
+            sweep_browse    // NEW
         );
         self.elements
             .recorder_button_replica
@@ -268,6 +277,36 @@ impl Ui {
         self.update_profile_sweep_controls();
         Ok(())
     }
+
+    fn sweep_browse_onclick(&self) -> Closure<dyn Fn() -> JsValue> {
+        let ui = self.clone();
+        Closure::new(move || {
+            let ui2 = ui.clone();
+            spawn_local(async move {
+                // Check API support (Firefox will fail this)
+                let has_api = js_sys::Reflect::has(
+                    &ui2.window.as_ref(),
+                    &JsValue::from_str("showSaveFilePicker")
+                ).unwrap_or(false);
+                if !has_api {
+                    let _ = ui2.alert("Your browser does not support the File System Access API. Use Chrome/Edge.");
+                    return;
+                }
+
+                // Suggest from the existing "Filename" field, fallback to .wfall
+                let suggested = ui2.elements.recording_metadata_filename.get()
+                    .unwrap_or_else(|| "waterfall.wfall".to_string());
+
+                let mut saver = ui2.file_save.borrow_mut();
+                match saver.browse(&suggested).await {
+                    Ok(()) => ui2.elements.sweep_output_path.set(&suggested),
+                    Err(e) => web_sys::console::error_1(&e),
+                }
+            });
+            JsValue::NULL
+        })
+    }
+
 }
 
 // Alert
@@ -882,6 +921,46 @@ impl Ui {
 
 }
 
+
+#[derive(serde::Serialize, Clone)]
+struct FileHeader {
+    sampling_rate_hz: u32,
+    rx_bandwidth_hz:  u32,
+    rx_gain_db:       f64,
+    integrations_exp: u32,
+    kurt1:            u32,
+    kurt2:            u32,
+    kurtosis_enabled: bool,
+    lpf_select:       bool,
+}
+
+impl Ui {
+    fn make_header(&self) -> Option<FileHeader> {
+        let st = self.api_state.borrow();
+        let s = st.as_ref()?;
+        Some(FileHeader {
+            sampling_rate_hz: s.ad9361.sampling_frequency,
+            rx_bandwidth_hz:  s.ad9361.rx_rf_bandwidth,
+            rx_gain_db:       s.ad9361.rx_gain,
+            integrations_exp: s.spectrometer.integrations_exp,
+            kurt1:            s.spectrometer.kurt_1,
+            kurt2:            s.spectrometer.kurt_2,
+            kurtosis_enabled: s.spectrometer.kurt_enable,
+            lpf_select:       s.spectrometer.lpf_select,
+        })
+    }
+
+    fn stop_file_async(&self) {
+        let saver_rc = self.file_save.clone();
+        spawn_local(async move {
+            let mut guard = saver_rc.borrow_mut();
+            // Move out and close once
+            let st = std::mem::take(&mut *guard);
+            let _ = st.stop().await;
+        });
+    }
+}
+
 // Time methods
 impl Ui {
     impl_patch!(time, maia_json::PatchTime, maia_json::Time, TIME_URL);
@@ -1000,10 +1079,7 @@ impl Ui {
         // Little-endian helpers
         let le_i16 = |i: usize| i16::from_le_bytes([footer[i], footer[i+1]]);
         let le_i32 = |i: usize| i32::from_le_bytes([footer[i], footer[i+1], footer[i+2], footer[i+3]]);
-        let le_i64 = |i: usize| i64::from_le_bytes([
-            footer[i], footer[i+1], footer[i+2], footer[i+3],
-            footer[i+4], footer[i+5], footer[i+6], footer[i+7]
-        ]);
+        
 
         // Temps: centi-°C
         if t_valid {
@@ -1038,11 +1114,42 @@ impl Ui {
     }
 }
 
+
+
+impl Ui {
+    /// True while we’re actively writing frames to disk
+    pub fn is_recording_enabled(&self) -> bool {
+        self.file_save.borrow().enabled
+    }
+
+    /// Clone the underlying sink object for writing without holding a RefCell borrow.
+    pub fn clone_file_sink(&self) -> Option<js_sys::Object> {
+        // expose via a method on SaveTarget (see file_writer.rs below)
+        self.file_save.borrow().clone_sink_object()
+    }
+}
+
+
 // Frequency profile logic
 impl Ui {
     /// Enforce the rules:
     /// 1) Must Apply before enabling sweep.
     /// 2) Must turn sweep OFF before applying again.
+    
+    /// Is the File System Access API present?
+    fn file_api_available(&self) -> bool {
+        js_sys::Reflect::has(&self.window.as_ref(), &JsValue::from_str("showSaveFilePicker"))
+            .unwrap_or(false)
+    }
+
+    /// Is the page in a secure context? (HTTPS or localhost)
+    fn is_secure_context(&self) -> bool {
+        js_sys::Reflect::get(&self.window.as_ref(), &JsValue::from_str("isSecureContext"))
+            .ok()
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+    }
+
     fn update_profile_sweep_controls(&self) {
         let sweep_on = self
             .api_state
@@ -1097,6 +1204,35 @@ impl Ui {
                     return JsValue::NULL;
                 }
 
+                // Decide if we can (and should) save to file
+                let can_save = ui.file_api_available() && ui.is_secure_context();
+
+                if can_save {
+                    // Require a chosen output file only when saving is possible
+                    if ui.elements.sweep_output_path.get().unwrap_or_default().is_empty() {
+                        let _ = ui.alert("Choose an output file first (Browse).");
+                        return JsValue::NULL;
+                    }
+
+                    // Open file and write JSON header
+                    if let Some(header) = ui.make_header() {
+                        let ui_open = ui.clone();
+                        spawn_local(async move {
+                            let mut saver = ui_open.file_save.borrow_mut();
+                            if let Err(e) = saver.start_with_header(&header).await {
+                                web_sys::console::error_1(&e);
+                                let _ = ui_open.alert("Failed to open file for writing.");
+                            }
+                        });
+                    }
+                } else {
+                    // Not a secure context / unsupported browser: sweep will run without saving
+                    web_sys::console::warn_1(
+                        &"File saving disabled (not secure context or API unavailable). Sweep will run without recording."
+                            .into(),
+                    );
+                }
+
                 // Optional optimistic UI
                 ui.elements.sweep_button.set_text_content(Some("Starting…"));
                 ui.elements.sweep_button.set_disabled(true);
@@ -1104,7 +1240,10 @@ impl Ui {
                 // PATCH sweep_enable: true
                 let ui2 = ui.clone();
                 future_to_promise(async move {
-                    let patch = maia_json::PatchSpectrometer { sweep_enable: Some(true), ..Default::default() };
+                    let patch = maia_json::PatchSpectrometer {
+                        sweep_enable: Some(true),
+                        ..Default::default()
+                    };
                     if let Some(updated) = request::ignore_request_failed(ui2.patch_spectrometer(&patch).await)? {
                         // Keep local state in sync so the label/disabled rules are correct
                         if let Some(state) = ui2.api_state.borrow_mut().as_mut() {
@@ -1126,7 +1265,10 @@ impl Ui {
 
                 let ui2 = ui.clone();
                 future_to_promise(async move {
-                    let patch = maia_json::PatchSpectrometer { sweep_enable: Some(false), ..Default::default() };
+                    let patch = maia_json::PatchSpectrometer {
+                        sweep_enable: Some(false),
+                        ..Default::default()
+                    };
                     if let Some(updated) = request::ignore_request_failed(ui2.patch_spectrometer(&patch).await)? {
                         if let Some(state) = ui2.api_state.borrow_mut().as_mut() {
                             state.spectrometer = updated.clone();
@@ -1139,12 +1281,17 @@ impl Ui {
                     } else {
                         ui2.update_profile_sweep_controls();
                     }
+
+                    // Close the file if we had opened one (no-op if not)
+                    ui2.stop_file_async();
+
                     Ok(JsValue::NULL)
                 })
                 .into()
             }
         })
     }
+
 
 
    

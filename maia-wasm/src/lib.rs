@@ -24,6 +24,7 @@ pub mod version;
 pub mod waterfall;
 pub mod waterfall_interaction;
 pub mod websocket;
+pub mod file_writer;
 
 /// Initialize the wasm module.
 ///

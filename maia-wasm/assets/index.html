@@ -112,8 +112,11 @@
             MHz
             </label>
             <button id="fprofile_apply" type="button">Apply</button>
-            
-            <button id="sweep_button" type="button" class="sweep_off">Start Sweep</button>
+            <span class="sweep_row">
+              <button id="sweep_button" type="button" class="sweep_off">Start Sweep</button>
+              <input id="sweep_output_path" type="text" readonly placeholder="Choose output file…" />
+              <button id="sweep_browse" type="button">Browse</button>
+            </span>
           </form>
         </div>
 
