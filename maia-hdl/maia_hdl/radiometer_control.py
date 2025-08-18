@@ -37,27 +37,26 @@ class Radiometer_control(Elaboratable):
 
 
         with m.If(self.sweep_mode):
-            with m.If(self.clken):
-                with m.If(self.integration_done):
-                    m.d.sync += self.abort_cnt.eq(self.ABORT_DELAY)
-                    with m.If(self.first):
-                        # if it is the very first measurement, we set the selection mask to 0
-                        m.d.sync += self.selection_mask.eq(0)
-                        m.d.sync += self.first.eq(0)
-                    with m.Else():
-                        # if it is not the first measurement, we increment the selection mask
-                        m.d.sync += self.selection_mask.eq(self.selection_mask + 1)
+            with m.If(self.integration_done):
+                m.d.sync += self.abort_cnt.eq(self.ABORT_DELAY)
+                with m.If(self.first):
+                    # if it is the very first measurement, we set the selection mask to 0
+                    m.d.sync += self.selection_mask.eq(0)
+                    m.d.sync += self.first.eq(0)
                 with m.Else():
-                    with m.If(self.abort_cnt == 1):
-                        m.d.sync += [
-                            self.abort_cnt.eq(0),
-                            self.abort.eq(1)]
-                    with m.Elif(self.abort_cnt == 0):
-                        m.d.sync += [
-                            self.abort_cnt.eq(0),
-                            self.abort.eq(0)]
-                    with m.Else():
-                        m.d.sync += self.abort_cnt.eq(self.abort_cnt - 1)
+                    # if it is not the first measurement, we increment the selection mask
+                    m.d.sync += self.selection_mask.eq(self.selection_mask + 1)
+            with m.Else():
+                with m.If(self.abort_cnt == 1):
+                    m.d.sync += [
+                        self.abort_cnt.eq(0),
+                        self.abort.eq(1)]
+                with m.Elif(self.abort_cnt == 0):
+                    m.d.sync += [
+                        self.abort_cnt.eq(0),
+                        self.abort.eq(0)]
+                with m.Else():
+                    m.d.sync += self.abort_cnt.eq(self.abort_cnt - 1)
 
             # output the current selection mask correctly
             m.d.comb += [
