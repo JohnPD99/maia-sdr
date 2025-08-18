@@ -51,7 +51,7 @@ impl App {
         // Build application objects
 
         let telemetry = Telemetry::new();
-        telemetry.spawn_inputs("/dev/ttyPS0", 9600, "/dev/i2c-1", 0x48, 0x49, 20);
+        telemetry.spawn_inputs("/dev/ttyPS0", 9600, "/dev/i2c-0", 0x48, 0x49, 300);
         
         let (waterfall_sender, _) = broadcast::channel(16);
         let spectrometer = Spectrometer::new(

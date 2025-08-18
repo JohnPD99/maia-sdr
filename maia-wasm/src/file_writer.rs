@@ -75,6 +75,16 @@ impl SaveTarget {
         Ok(())
     }
 
+    /// NEW (v2): Append one record with an optional footer:
+    /// [u32 bins][f32*bins][u32 tail_len][tail_bytes]
+    pub async fn write_frame_plus_footer(&self, frame: &[f32], footer: Option<&[u8]>) -> Result<(), JsValue> {
+        if !self.enabled { return Ok(()); }
+        let sink: FileSystemWritableFileStream = self.sink.as_ref()
+            .ok_or_else(|| JsValue::from_str("Sink not open"))?
+            .clone().unchecked_into();
+        Self::write_frame_plus_footer_with_sink(sink.unchecked_into(), frame, footer).await
+    }
+
     pub async fn stop(mut self) -> Result<(), JsValue> {
         if let Some(sink_obj) = self.sink.take() {
             let sink: FileSystemWritableFileStream = sink_obj.unchecked_into();
@@ -83,7 +93,7 @@ impl SaveTarget {
         Ok(())
     }
 
-     /// Expose enabled state via Ui
+    /// Expose enabled state via Ui
     pub fn is_enabled(&self) -> bool { self.enabled }
 
     /// Clone the writable stream object so callers can write without borrowing `self`.
@@ -108,6 +118,41 @@ impl SaveTarget {
             core::slice::from_raw_parts(frame.as_ptr() as *const u8, frame.len() * 4)
         };
         JsFuture::from(sink.write(&Uint8Array::from(bytes).into())).await?;
+        Ok(())
+    }
+
+    /// NEW (v2): Same as above, but also writes an optional footer:
+    /// [u32 bins][f32*bins][u32 tail_len][tail_bytes]
+    pub async fn write_frame_plus_footer_with_sink(
+        sink_obj: js_sys::Object,
+        frame: &[f32],
+        footer: Option<&[u8]>,
+    ) -> Result<(), JsValue> {
+        let sink: FileSystemWritableFileStream = sink_obj.unchecked_into();
+
+        // 1) bins
+        let bins = frame.len() as u32;
+        let mut prefix = [0u8; 4];
+        prefix.copy_from_slice(&bins.to_le_bytes());
+        JsFuture::from(sink.write(&Uint8Array::from(prefix.as_slice()).into())).await?;
+
+        // 2) floats
+        let bytes: &[u8] = unsafe {
+            core::slice::from_raw_parts(frame.as_ptr() as *const u8, frame.len() * 4)
+        };
+        JsFuture::from(sink.write(&Uint8Array::from(bytes).into())).await?;
+
+        // 3) footer length
+        let tail_len: u32 = footer.map(|f| f.len() as u32).unwrap_or(0);
+        let mut tl = [0u8; 4];
+        tl.copy_from_slice(&tail_len.to_le_bytes());
+        JsFuture::from(sink.write(&Uint8Array::from(tl.as_slice()).into())).await?;
+
+        // 4) footer bytes (if any)
+        if let Some(f) = footer {
+            JsFuture::from(sink.write(&Uint8Array::from(f).into())).await?;
+        }
+
         Ok(())
     }
 }

@@ -51,10 +51,10 @@ impl Telemetry {
         i2c_path: &str,  // e.g. "/dev/i2c-1"
         addr0: u16,      // 0x48
         addr1: u16,      // 0x49
-        poll_ms: u64,    // e.g. 20
+        temp_poll_ms: u64,    // e.g. 20
     ) {
         self.gps.spawn(gps_tty, gps_baud);
-        self.temps.spawn(i2c_path, addr0, addr1, poll_ms);
+        self.temps.spawn(i2c_path, addr0, addr1, temp_poll_ms);
     }
 
     /// Build the 32-byte footer from the latest samples.

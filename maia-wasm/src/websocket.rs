@@ -65,7 +65,7 @@ impl WebSocketClient {
 
 fn onmessage(
     waterfall: Rc<RefCell<Waterfall>>,
-    ui: Ui, // <-- added
+    ui: Ui,
 ) -> Closure<dyn Fn(MessageEvent)> {
     Closure::new(move |event: MessageEvent| {
         // Expect an ArrayBuffer
@@ -87,11 +87,23 @@ fn onmessage(
         let total = abuf.byte_length() as usize;
         if total != BYTES_BINS && total != BYTES_BINS + FOOTER {
             web_sys::console::warn_1(
-                &format!("unexpected WS frame size: {} (expected {} or {})",
-                         total, BYTES_BINS, BYTES_BINS + FOOTER).into()
+                &format!(
+                    "unexpected WS frame size: {} (expected {} or {})",
+                    total, BYTES_BINS, BYTES_BINS + FOOTER
+                ).into()
             );
             return;
         }
+
+        // ----- Extract optional footer bytes up-front -----
+        let has_footer = total == BYTES_BINS + FOOTER;
+        let footer_opt: Option<Vec<u8>> = if has_footer {
+            let u8_view = js_sys::Uint8Array::new(&abuf)
+                .subarray(BYTES_BINS as u32, (BYTES_BINS + FOOTER) as u32);
+            Some(u8_view.to_vec())
+        } else {
+            None
+        };
 
         // Spectrum view: first 4096 floats
         let f32_view = js_sys::Float32Array::new(&abuf).subarray(0, BINS as u32);
@@ -103,28 +115,30 @@ fn onmessage(
             let mut frame = vec![0f32; BINS];
             f32_view.copy_to(&mut frame[..]);
 
+            // Move a clone of the footer into the async block
+            let footer_for_write = footer_opt.clone();
+
             // clone a sink object WITHOUT holding a RefCell borrow across .await
             if let Some(sink_obj) = ui.clone_file_sink() {
                 spawn_local(async move {
-                    if let Err(e) = SaveTarget::write_frame_with_sink(sink_obj, &frame).await {
+                    if let Err(e) = SaveTarget::write_frame_plus_footer_with_sink(
+                        sink_obj,
+                        &frame,
+                        footer_for_write.as_deref(), // Option<&[u8]>
+                    ).await {
                         web_sys::console::error_1(&e);
                     }
                 });
             }
         }
 
-
-
-        // Optional 32-byte footer: last bytes
-        if total == BYTES_BINS + FOOTER {
-            let u8_view = js_sys::Uint8Array::new(&abuf)
-                .subarray(BYTES_BINS as u32, (BYTES_BINS + FOOTER) as u32);
-            let mut footer = [0u8; FOOTER];
-            u8_view.copy_to(&mut footer);
-            ui.apply_telemetry_footer(&footer);
+        // Apply telemetry overlay to UI (if present)
+        if let Some(ref footer) = footer_opt {
+            ui.apply_telemetry_footer(footer);
         }
     })
 }
+
 
 impl WebSocketData {
     fn connect(&self) -> Result<(), JsValue> {
