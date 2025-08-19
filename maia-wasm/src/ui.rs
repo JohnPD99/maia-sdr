@@ -932,12 +932,34 @@ struct FileHeader {
     kurt2:            u32,
     kurtosis_enabled: bool,
     lpf_select:       bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    freq_profiles_hz: Option<[u64; 8]>,
 }
 
 impl Ui {
     fn make_header(&self) -> Option<FileHeader> {
         let st = self.api_state.borrow();
         let s = st.as_ref()?;
+
+
+        // Try to read all 8 profile inputs (Hz). If any is None, we'll omit the field.
+        let freq_profiles_hz = match (
+            self.elements.fprofile0.get(),
+            self.elements.fprofile1.get(),
+            self.elements.fprofile2.get(),
+            self.elements.fprofile3.get(),
+            self.elements.fprofile4.get(),
+            self.elements.fprofile5.get(),
+            self.elements.fprofile6.get(),
+            self.elements.fprofile7.get(),
+        ) {
+            (Some(v0), Some(v1), Some(v2), Some(v3), Some(v4), Some(v5), Some(v6), Some(v7)) => {
+                Some([v0, v1, v2, v3, v4, v5, v6, v7])
+            }
+            _ => None,
+        };
+
+
         Some(FileHeader {
             sampling_rate_hz: s.ad9361.sampling_frequency,
             rx_bandwidth_hz:  s.ad9361.rx_rf_bandwidth,
@@ -947,6 +969,7 @@ impl Ui {
             kurt2:            s.spectrometer.kurt_2,
             kurtosis_enabled: s.spectrometer.kurt_enable,
             lpf_select:       s.spectrometer.lpf_select,
+            freq_profiles_hz,
         })
     }
 
