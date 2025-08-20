@@ -89,14 +89,11 @@ class Kurthosis_Spectrometer(Elaboratable):
         self.kurt1 = Signal(self.kurtwidth)
         self.kurt2 = Signal(self.kurtwidth)
         self.kurt_enable = Signal()
-        self.port_select = Signal(2)
-        self.freq_profile = Signal(3)
-        self.lpf_select = Signal()
+        
         self.sweep_enable = Signal()
-
-        self.rf_sw = Signal(3)
-        self.gpio_ctl = Signal(4)
-
+        self.selection_reg = Signal(7)
+        self.selection_ctrl = Signal(7)
+        self.selection_ctrl_q = Signal(7)
 
     def ports(self):
         return self.dma.axi.ports() + [
@@ -172,10 +169,8 @@ class Kurthosis_Spectrometer(Elaboratable):
             control.clken.eq(self.strobe_in),
             control.integration_done.eq(integrator.done),
             control.sweep_mode.eq(self.sweep_enable),
-            control.port_select.eq(self.port_select),
-            control.freq_select.eq(self.freq_profile),
-            control.lpf_select.eq(self.lpf_select),
-
+            control.selection_reg.eq(self.selection_reg),
+            
 
             dma.rdata.eq(dma_rdata),
             dma.start.eq(integrator.done),
@@ -183,8 +178,8 @@ class Kurthosis_Spectrometer(Elaboratable):
 
             self.interrupt_out.eq(~dma.busy & dma_busy_q),
 
-            self.rf_sw.eq(control.rf_sw),
-            self.gpio_ctl.eq(control.gpio_ctl)
+            self.selection_ctrl.eq(control.selection_ctrl),
+            self.selection_ctrl_q.eq(control.selection_ctrl_q)
         ]
         return m
 

@@ -599,7 +599,6 @@ class TRTSDR(Elaboratable):
 
         # Control Signals
         self.gpio_ctl = Signal(4)
-
         self.rf_sw = Signal(3)
 
     def ports(self):
@@ -690,9 +689,12 @@ class TRTSDR(Elaboratable):
             self.spectrometer.kurt1.eq(self.sdr_registers['spectrometer']['kurt_coeff_1']),
             self.spectrometer.kurt2.eq(self.sdr_registers['spectrometer']['kurt_coeff_2']),
             self.spectrometer.kurt_enable.eq(self.sdr_registers['spectrometer']['kurt_enable']),
-            self.spectrometer.port_select.eq(self.sdr_registers['spectrometer']['port_select']),
-            self.spectrometer.freq_profile.eq(self.sdr_registers['spectrometer']['freq_profile']),
-            self.spectrometer.lpf_select.eq(self.sdr_registers['spectrometer']['lpf_select']),
+            
+            self.spectrometer.selection_reg.eq(Cat(self.sdr_registers['spectrometer']['port_select'],
+                                                   self.sdr_registers['spectrometer']['lpf_select'],
+                                                   0,
+                                                   self.sdr_registers['spectrometer']['freq_profile'])),
+            
             self.spectrometer.sweep_enable.eq(self.sdr_registers['spectrometer']['sweep_enable']),
         ]
 
@@ -788,11 +790,11 @@ class TRTSDR(Elaboratable):
         ]
 
         # Preliminary pin control
-        m.d.comb += self.gpio_ctl.eq(self.spectrometer.gpio_ctl)
-        m.d.comb += self.rf_sw.eq(self.spectrometer.rf_sw)
+        m.d.comb += self.gpio_ctl.eq(self.spectrometer.selection_ctrl[3:])
+        m.d.comb += self.rf_sw.eq(self.spectrometer.selection_ctrl[0:3])
 
         # sweep_cnt 
-        m.d.comb +=  self.sdr_registers['spectrometer2']['sweep_cnt'].eq(Cat(self.rf_sw, self.gpio_ctl))
+        m.d.comb +=  self.sdr_registers['spectrometer2']['sweep_cnt'].eq(self.spectrometer.selection_ctrl_q)
 
         return m
 
