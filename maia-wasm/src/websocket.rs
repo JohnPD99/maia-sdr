@@ -8,9 +8,8 @@ use wasm_bindgen::closure::Closure;
 use web_sys::{CloseEvent, MessageEvent, WebSocket, Window};
 
 use crate::waterfall::Waterfall;
-use crate::ui::Ui; // <-- added
-use crate::file_writer::SaveTarget;
-use wasm_bindgen_futures::spawn_local; // add this
+use crate::ui::Ui;
+use wasm_bindgen_futures::spawn_local;
 
 /// WebSocket client for waterfall data.
 ///
@@ -34,18 +33,17 @@ impl WebSocketClient {
     /// Starts the WebSocket client.
     ///
     /// The client is given shared mutable access to the [`Waterfall`].
-    /// `ui` is used to apply an optional 32-byte telemetry footer overlay.
+    /// `ui` is used for telemetry overlay and recording.
     pub fn start(
         window: &Window,
         waterfall: Rc<RefCell<Waterfall>>,
-        ui: Ui, // <-- added
+        ui: Ui,
     ) -> Result<(), JsValue> {
         let location = window.location();
         let protocol = if location.protocol()? == "https:" { "wss" } else { "ws" };
         let hostname = location.hostname()?;
         let port = location.port()?;
-        
-        
+
         let url = if port.is_empty() {
             format!("{protocol}://{hostname}/waterfall")
         } else {
@@ -53,7 +51,7 @@ impl WebSocketClient {
         };
         let data = Rc::new(WebSocketData {
             url,
-            onmessage: onmessage(waterfall, ui).into_js_value(), // <-- pass ui
+            onmessage: onmessage(waterfall, ui).into_js_value(),
             onclose: RefCell::new(None),
         });
         data.setup_onclose();
@@ -111,25 +109,22 @@ fn onmessage(
 
         // If recording is enabled, append this frame to disk (non-blocking)
         if ui.is_recording_enabled() {
-            // copy out of the JS view
+            // Copy out of the JS view
             let mut frame = vec![0f32; BINS];
             f32_view.copy_to(&mut frame[..]);
 
-            // Move a clone of the footer into the async block
+            // Move data into the async task
             let footer_for_write = footer_opt.clone();
+            let saver = ui.saver(); // Rc<SaveTarget>
 
-            // clone a sink object WITHOUT holding a RefCell borrow across .await
-            if let Some(sink_obj) = ui.clone_file_sink() {
-                spawn_local(async move {
-                    if let Err(e) = SaveTarget::write_frame_plus_footer_with_sink(
-                        sink_obj,
-                        &frame,
-                        footer_for_write.as_deref(), // Option<&[u8]>
-                    ).await {
-                        web_sys::console::error_1(&e);
-                    }
-                });
-            }
+            spawn_local(async move {
+                if let Err(e) = saver
+                    .write_frame_plus_footer(&frame, footer_for_write.as_deref())
+                    .await
+                {
+                    web_sys::console::error_1(&e);
+                }
+            });
         }
 
         // Apply telemetry overlay to UI (if present)
@@ -138,7 +133,6 @@ fn onmessage(
         }
     })
 }
-
 
 impl WebSocketData {
     fn connect(&self) -> Result<(), JsValue> {
@@ -156,7 +150,9 @@ impl WebSocketData {
         let data = Rc::clone(self);
         let closure = Closure::<dyn Fn(CloseEvent)>::new(move |_: CloseEvent| {
             // Simple reconnect loop; consider adding backoff if desired
-            data.connect().unwrap();
+            if let Err(e) = data.connect() {
+                web_sys::console::error_1(&e);
+            }
         });
         *self.onclose.borrow_mut() = Some(closure.into_js_value());
     }

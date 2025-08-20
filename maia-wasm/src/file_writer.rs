@@ -5,6 +5,11 @@ use wasm_bindgen_futures::JsFuture;
 use js_sys::{Object, Uint8Array};
 use serde::Serialize;
 
+// Serialize writes across tasks
+use futures::lock::Mutex;
+use std::cell::{Cell, RefCell};
+use std::sync::Arc;
+
 #[wasm_bindgen]
 extern "C" {
     // File System Access API (Chromium)
@@ -22,137 +27,144 @@ extern "C" {
     fn close(this: &FileSystemWritableFileStream) -> js_sys::Promise;
 }
 
-#[derive(Default)]
 pub struct SaveTarget {
-    handle: Option<js_sys::Object>,  // FileSystemFileHandle
-    sink:   Option<js_sys::Object>,  // FileSystemWritableFileStream
-    pub enabled: bool,               // true while recording
+    // Interior mutability so methods can take &self
+    handle: RefCell<Option<js_sys::Object>>,  // FileSystemFileHandle
+    sink:   RefCell<Option<js_sys::Object>>,  // FileSystemWritableFileStream
+    enabled: Cell<bool>,                      // true while recording
+    // Serialize all writes
+    write_lock: Arc<Mutex<()>>,
+}
+
+impl Default for SaveTarget {
+    fn default() -> Self {
+        Self {
+            handle: RefCell::new(None),
+            sink: RefCell::new(None),
+            enabled: Cell::new(false),
+            write_lock: Arc::new(Mutex::new(())),
+        }
+    }
 }
 
 impl SaveTarget {
     pub fn new() -> Self { Self::default() }
 
-    pub async fn browse(&mut self, suggested_name: &str) -> Result<(), JsValue> {
+    /// Open a file picker with a suggested name.
+    pub async fn browse(&self, suggested_name: &str) -> Result<(), JsValue> {
         let o = Object::new();
         js_sys::Reflect::set(&o, &"suggestedName".into(), &suggested_name.into())?;
         let handle_val = JsFuture::from(show_save_file_picker(o.into())).await?;
-        self.handle = Some(handle_val.unchecked_into());
+        *self.handle.borrow_mut() = Some(handle_val.unchecked_into());
         Ok(())
     }
 
-    pub async fn start_with_header<T: Serialize>(&mut self, header: &T) -> Result<(), JsValue> {
-        let handle: FileSystemFileHandle = self.handle.as_ref()
+    /// Create a writable stream and write the JSON header (+ newline).
+    pub async fn start_with_header<T: Serialize>(&self, header: &T) -> Result<(), JsValue> {
+        let handle: FileSystemFileHandle = self
+            .handle
+            .borrow()
+            .as_ref()
             .ok_or_else(|| JsValue::from_str("No file chosen"))?
-            .clone().unchecked_into();
+            .clone()
+            .unchecked_into();
 
         let sink_val = JsFuture::from(handle.create_writable()).await?;
         let sink: FileSystemWritableFileStream = sink_val.unchecked_into();
-        self.sink = Some(sink.clone().unchecked_into());
+        *self.sink.borrow_mut() = Some(sink.clone().unchecked_into());
 
         // Header = JSON + newline
         let json = serde_json::to_string(header).unwrap() + "\n";
         let enc = web_sys::TextEncoder::new()?.encode_with_input(&json);
-        JsFuture::from(sink.write(&Uint8Array::from(enc.as_ref()).into())).await?;
 
-        self.enabled = true;
+        let _g = self.write_lock.lock().await;
+        JsFuture::from(sink.write(&Uint8Array::from(enc.as_ref()).into())).await?;
+        self.enabled.set(true);
         Ok(())
     }
 
     /// Append one frame: [u32 LE length][f32 little-endian bytes]
     pub async fn write_frame(&self, frame: &[f32]) -> Result<(), JsValue> {
-        if !self.enabled { return Ok(()); }
-        let sink: FileSystemWritableFileStream = self.sink.as_ref()
+        if !self.enabled.get() { return Ok(()); }
+        let sink: FileSystemWritableFileStream = self
+            .sink
+            .borrow()
+            .as_ref()
             .ok_or_else(|| JsValue::from_str("Sink not open"))?
-            .clone().unchecked_into();
+            .clone()
+            .unchecked_into();
 
+        // Build a single buffer for atomic-ish write
+        let mut buf = Vec::with_capacity(4 + frame.len() * 4);
+
+        // length prefix
         let len = frame.len() as u32;
-        let mut prefix = [0u8; 4];
-        prefix.copy_from_slice(&len.to_le_bytes());
-        JsFuture::from(sink.write(&Uint8Array::from(prefix.as_slice()).into())).await?;
+        buf.extend_from_slice(&len.to_le_bytes());
 
-        let bytes: &[u8] = unsafe { core::slice::from_raw_parts(frame.as_ptr() as *const u8, frame.len()*4) };
-        JsFuture::from(sink.write(&Uint8Array::from(bytes).into())).await?;
-        Ok(())
-    }
-
-    /// NEW (v2): Append one record with an optional footer:
-    /// [u32 bins][f32*bins][u32 tail_len][tail_bytes]
-    pub async fn write_frame_plus_footer(&self, frame: &[f32], footer: Option<&[u8]>) -> Result<(), JsValue> {
-        if !self.enabled { return Ok(()); }
-        let sink: FileSystemWritableFileStream = self.sink.as_ref()
-            .ok_or_else(|| JsValue::from_str("Sink not open"))?
-            .clone().unchecked_into();
-        Self::write_frame_plus_footer_with_sink(sink.unchecked_into(), frame, footer).await
-    }
-
-    pub async fn stop(mut self) -> Result<(), JsValue> {
-        if let Some(sink_obj) = self.sink.take() {
-            let sink: FileSystemWritableFileStream = sink_obj.unchecked_into();
-            let _ = JsFuture::from(sink.close()).await?;
-        }
-        Ok(())
-    }
-
-    /// Expose enabled state via Ui
-    pub fn is_enabled(&self) -> bool { self.enabled }
-
-    /// Clone the writable stream object so callers can write without borrowing `self`.
-    pub fn clone_sink_object(&self) -> Option<js_sys::Object> {
-        self.sink.clone()
-    }
-
-    /// Write a frame given a writable sink object (no RefCell involved).
-    pub async fn write_frame_with_sink(
-        sink_obj: js_sys::Object,
-        frame: &[f32],
-    ) -> Result<(), JsValue> {
-        // SAFETY: same as your write_frame()
-        let sink: FileSystemWritableFileStream = sink_obj.unchecked_into();
-
-        let len = frame.len() as u32;
-        let mut prefix = [0u8; 4];
-        prefix.copy_from_slice(&len.to_le_bytes());
-        JsFuture::from(sink.write(&Uint8Array::from(prefix.as_slice()).into())).await?;
-
+        // floats (little-endian as bytes)
         let bytes: &[u8] = unsafe {
             core::slice::from_raw_parts(frame.as_ptr() as *const u8, frame.len() * 4)
         };
-        JsFuture::from(sink.write(&Uint8Array::from(bytes).into())).await?;
+        buf.extend_from_slice(bytes);
+
+        let _g = self.write_lock.lock().await;
+        JsFuture::from(sink.write(&Uint8Array::from(buf.as_slice()).into())).await?;
         Ok(())
     }
 
-    /// NEW (v2): Same as above, but also writes an optional footer:
-    /// [u32 bins][f32*bins][u32 tail_len][tail_bytes]
-    pub async fn write_frame_plus_footer_with_sink(
-        sink_obj: js_sys::Object,
-        frame: &[f32],
-        footer: Option<&[u8]>,
-    ) -> Result<(), JsValue> {
-        let sink: FileSystemWritableFileStream = sink_obj.unchecked_into();
+    /// v2 record: [u32 bins][f32*bins][u32 tail_len][tail_bytes]
+    pub async fn write_frame_plus_footer(&self, frame: &[f32], footer: Option<&[u8]>) -> Result<(), JsValue> {
+        if !self.enabled.get() { return Ok(()); }
+        let sink: FileSystemWritableFileStream = self
+            .sink
+            .borrow()
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Sink not open"))?
+            .clone()
+            .unchecked_into();
+
+        let bins = frame.len() as u32;
+        let tail_len: u32 = footer.map(|f| f.len() as u32).unwrap_or(0);
+        let floats_bytes_len = frame.len() * 4;
+
+        let total = 4 /*bins*/ + floats_bytes_len + 4 /*tail_len*/ + tail_len as usize;
+        let mut buf = Vec::with_capacity(total);
 
         // 1) bins
-        let bins = frame.len() as u32;
-        let mut prefix = [0u8; 4];
-        prefix.copy_from_slice(&bins.to_le_bytes());
-        JsFuture::from(sink.write(&Uint8Array::from(prefix.as_slice()).into())).await?;
+        buf.extend_from_slice(&bins.to_le_bytes());
 
         // 2) floats
         let bytes: &[u8] = unsafe {
-            core::slice::from_raw_parts(frame.as_ptr() as *const u8, frame.len() * 4)
+            core::slice::from_raw_parts(frame.as_ptr() as *const u8, floats_bytes_len)
         };
-        JsFuture::from(sink.write(&Uint8Array::from(bytes).into())).await?;
+        buf.extend_from_slice(bytes);
 
         // 3) footer length
-        let tail_len: u32 = footer.map(|f| f.len() as u32).unwrap_or(0);
-        let mut tl = [0u8; 4];
-        tl.copy_from_slice(&tail_len.to_le_bytes());
-        JsFuture::from(sink.write(&Uint8Array::from(tl.as_slice()).into())).await?;
+        buf.extend_from_slice(&tail_len.to_le_bytes());
 
         // 4) footer bytes (if any)
         if let Some(f) = footer {
-            JsFuture::from(sink.write(&Uint8Array::from(f).into())).await?;
+            buf.extend_from_slice(f);
         }
 
+        let _g = self.write_lock.lock().await;
+        JsFuture::from(sink.write(&Uint8Array::from(buf.as_slice()).into())).await?;
         Ok(())
     }
+
+    /// Close the stream (non-consuming). Safe even if called when not open.
+    pub async fn stop(&self) -> Result<(), JsValue> {
+        // Ensure no writes are in-flight before closing
+        let _g = self.write_lock.lock().await;
+
+        if let Some(sink_obj) = self.sink.borrow_mut().take() {
+            let sink: FileSystemWritableFileStream = sink_obj.unchecked_into();
+            let _ = JsFuture::from(sink.close()).await?;
+        }
+        self.enabled.set(false);
+        Ok(())
+    }
+
+    /// Expose enabled state for the UI.
+    pub fn is_enabled(&self) -> bool { self.enabled.get() }
 }

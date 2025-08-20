@@ -17,8 +17,7 @@ use web_sys::{
     HtmlParagraphElement, HtmlSelectElement, HtmlSpanElement, PositionOptions, Response, Window,
 };
 
-
-use crate::file_writer::SaveTarget;                                    // new
+use crate::file_writer::SaveTarget; // updated writer
 use crate::render::RenderEngine;
 use crate::waterfall::Waterfall;
 
@@ -36,8 +35,6 @@ pub mod request;
 
 const API_URL: &str = "/api";
 const AD9361_URL: &str = "/api/ad9361";
-//const DDC_CONFIG_URL: &str = "/api/ddc/config";
-//const DDC_DESIGN_URL: &str = "/api/ddc/design";
 const GEOLOCATION_URL: &str = "/api/geolocation";
 const RECORDER_URL: &str = "/api/recorder";
 const RECORDING_METADATA_URL: &str = "/api/recording/metadata";
@@ -60,7 +57,8 @@ pub struct Ui {
     render_engine: Rc<RefCell<RenderEngine>>,
     waterfall: Rc<RefCell<Waterfall>>,
     freq_profiles_dirty: Rc<Cell<bool>>, // true => must Apply before enabling sweep
-    file_save: Rc<RefCell<SaveTarget>>, // new: holds the file handle/stream + enabled flag
+    // CHANGED: no outer RefCell; SaveTarget provides interior mutability + locking
+    file_save: Rc<SaveTarget>,
 }
 
 // Defines the 'struct Elements' and its constructor
@@ -131,7 +129,6 @@ ui_elements! {
 
     sweep_button: HtmlButtonElement => Rc<HtmlButtonElement>,
 
-
     // Frequency profiles: user types MHz; NumberInput converts to Hz (u64)
     fprofile0: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
     fprofile1: HtmlInputElement => NumberInput<u64, input::MHzPresentation>,
@@ -152,10 +149,8 @@ ui_elements! {
     tele_temp0:   HtmlSpanElement => Rc<HtmlSpanElement>,
     tele_temp1:   HtmlSpanElement => Rc<HtmlSpanElement>,
 
-
     sweep_output_path: HtmlInputElement => TextInput,
     sweep_browse: HtmlButtonElement => Rc<HtmlButtonElement>,
-
 }
 
 impl Ui {
@@ -179,7 +174,8 @@ impl Ui {
             render_engine,
             waterfall,
             freq_profiles_dirty: Rc::new(Cell::new(true)), // must Apply before first sweep
-            file_save: Rc::new(RefCell::new(SaveTarget::new())),
+            // CHANGED
+            file_save: Rc::new(SaveTarget::new()),
         };
         ui.elements
             .maia_wasm_version
@@ -225,8 +221,6 @@ impl Ui {
             geolocation_watch
         );
 
-
-
         // This uses a custom onchange function that calls the macro-generated one.
         let rx_gain_cb = self.ad9361_rx_gain_onchange_manual();
         self.elements
@@ -250,14 +244,13 @@ impl Ui {
             waterfall_tab,
             geolocation_tab,
             other_tab,
-            fprofile_apply, // <-- add
-            sweep_button,          // <-- add this
-            sweep_browse    // NEW
+            fprofile_apply,
+            sweep_button,
+            sweep_browse
         );
         self.elements
             .recorder_button_replica
             .set_onclick(self.elements.recorder_button.onclick().as_ref());
-
 
         let mark_dirty = self.fprofile_mark_dirty_onchange();
         let f: &js_sys::Function = mark_dirty.as_ref().unchecked_ref();
@@ -269,7 +262,7 @@ impl Ui {
         self.elements.fprofile5.set_onchange(Some(f));
         self.elements.fprofile6.set_onchange(Some(f));
         self.elements.fprofile7.set_onchange(Some(f));
-        mark_dirty.forget(); // <- keep it alive for all eight fields
+        mark_dirty.forget();
         Ok(())
     }
 
@@ -297,7 +290,8 @@ impl Ui {
                 let suggested = ui2.elements.recording_metadata_filename.get()
                     .unwrap_or_else(|| "waterfall.wfall".to_string());
 
-                let mut saver = ui2.file_save.borrow_mut();
+                // CHANGED: no RefCell borrow held across await
+                let saver = ui2.file_save.clone();
                 match saver.browse(&suggested).await {
                     Ok(()) => ui2.elements.sweep_output_path.set(&suggested),
                     Err(e) => web_sys::console::error_1(&e),
@@ -306,7 +300,6 @@ impl Ui {
             JsValue::NULL
         })
     }
-
 }
 
 // Alert
@@ -326,18 +319,16 @@ impl Ui {
 // Settings
 impl Ui {
     fn settings_button_onclick(&self) -> Closure<dyn Fn()> {
-            let ui = self.clone();
-            Closure::new(move || {
-                if ui.elements.settings.open() {
-                    ui.elements.settings.close();
-                } else {
-                    if let Err(err) = ui.elements.settings.show_modal() {
-                        // Fallback + log if modal fails (older browsers)
-                        web_sys::console::error_2(&"dialog.showModal() failed".into(), &err);
-                        ui.elements.settings.show();
-                    }
-                }
-            })
+        let ui = self.clone();
+        Closure::new(move || {
+            if ui.elements.settings.open() {
+                ui.elements.settings.close();
+            } else if let Err(err) = ui.elements.settings.show_modal() {
+                // Fallback + log if modal fails (older browsers)
+                web_sys::console::error_2(&"dialog.showModal() failed".into(), &err);
+                ui.elements.settings.show();
+            }
+        })
     }
 
     fn close_settings_onclick(&self) -> Closure<dyn Fn()> {
@@ -368,7 +359,7 @@ impl Ui {
         self.window
             .set_interval_with_callback_and_timeout_and_arguments_0(f, interval_ms)?;
 
-        handler.forget(); // <- keep it alive for the life of the interval
+        handler.forget();
         Ok(())
     }
 
@@ -386,10 +377,8 @@ impl Ui {
         self.update_geolocation_elements(&json.geolocation)?;
         self.update_versions_elements(&json.versions);
 
-        // This potentially takes some time to complete, since it might have to
-        // do a fetch call to PATCH the server time. We do this last.
+        // Do this last; may PATCH server time
         self.update_server_time(&json.time).await?;
-
         Ok(())
     }
 
@@ -404,10 +393,6 @@ impl Ui {
 // AD9361 methods
 impl Ui {
     /// Sets the value of the RX frequency.
-    ///
-    /// This is accomplished either by changing the DDC frequency when the DDC
-    /// is the input of the waterfall and the frequency can still be changed, or
-    /// by changing the AD9361 frequency otherwise.
     pub fn set_rx_frequency(&self, freq: u64) -> Result<(), JsValue> {
         let ad9361_freq = Some(freq);
         let state = self.api_state.borrow();
@@ -416,7 +401,6 @@ impl Ui {
         };
 
         if let Some(freq) = ad9361_freq {
-            // Change the AD9361 frequency
             self.elements.ad9361_rx_lo_frequency.set(&freq);
             self.elements
                 .ad9361_rx_lo_frequency
@@ -465,9 +449,6 @@ impl Ui {
         self.elements.ad9361_rx_gain.set_disabled(disabled);
     }
 
-    // Custom onchange function for the RX gain. This avoids trying to change
-    // the gain when the AGC is not in manual mode, which would give an HTTP 500
-    // error in the PATCH request.
     fn ad9361_rx_gain_onchange_manual(&self) -> Closure<dyn Fn() -> JsValue> {
         let closure = self.ad9361_rx_gain_onchange();
         let ui = self.clone();
@@ -479,7 +460,6 @@ impl Ui {
             if !matches!(state.ad9361.rx_gain_mode, maia_json::Ad9361GainMode::Manual) {
                 return JsValue::NULL;
             }
-            // Run macro-generated closure to parse the entry value and make a FETCH request
             closure
                 .as_ref()
                 .unchecked_ref::<js_sys::Function>()
@@ -491,7 +471,6 @@ impl Ui {
 
 // Geolocation methods
 
-// the fields are required for Deserialize, but not all of them are read
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq, Deserialize)]
 struct GeolocationPosition {
@@ -499,7 +478,6 @@ struct GeolocationPosition {
     timestamp: f64,
 }
 
-// the fields are required for Deserialize, but not all of them are read
 #[allow(dead_code, non_snake_case)]
 #[derive(Debug, Copy, Clone, PartialEq, Deserialize)]
 struct GeolocationCoordinates {
@@ -535,17 +513,9 @@ impl Ui {
             element.set_text_content(Some(&format!(
                 "{:.6}°{} {:.6}°{}{}",
                 geolocation.latitude.abs(),
-                if geolocation.latitude >= 0.0 {
-                    "N"
-                } else {
-                    "S"
-                },
+                if geolocation.latitude >= 0.0 { "N" } else { "S" },
                 geolocation.longitude.abs(),
-                if geolocation.longitude >= 0.0 {
-                    "E"
-                } else {
-                    "W"
-                },
+                if geolocation.longitude >= 0.0 { "E" } else { "W" },
                 if let Some(altitude) = geolocation.altitude {
                     format!(" {altitude:.1}m")
                 } else {
@@ -569,12 +539,9 @@ impl Ui {
         {
             let geolocation = self.geolocation.borrow();
             if geolocation.is_some() {
-                // Geolocation object has been previously obtained. Return it.
                 return Ok(Ref::map(geolocation, |opt| opt.as_ref().unwrap()));
             }
         }
-        // No Geolocation object previously obtained. Get one from
-        // Navigator. This will prompt the user for authorization.
         let geolocation = self.window.navigator().geolocation()?;
         self.geolocation.borrow_mut().replace(geolocation);
         Ok(Ref::map(self.geolocation.borrow(), |opt| {
@@ -633,8 +600,6 @@ impl Ui {
             }
             if enabled {
                 if ui.geolocation_watch_id.get().is_some() {
-                    // This shouldn't typically happend, but just in case, do
-                    // nothing if we already have a watch_id.
                     return;
                 }
                 let options = PositionOptions::new();
@@ -651,13 +616,8 @@ impl Ui {
                     }
                 };
                 ui.geolocation_watch_id.set(Some(id));
-            } else {
-                // It can happen that geolocation_watch_id contains None, for
-                // instance if this onchange closure is called by
-                // preferences.apply at initialization.
-                if let Some(id) = ui.geolocation_watch_id.take() {
-                    geolocation_api.clear_watch(id);
-                }
+            } else if let Some(id) = ui.geolocation_watch_id.take() {
+                geolocation_api.clear_watch(id);
             }
         })
     }
@@ -719,7 +679,6 @@ impl Ui {
     fn geolocation_clear_onclick(&self) -> Closure<dyn Fn() -> JsValue> {
         let ui = self.clone();
         Closure::new(move || {
-            // force geolocation_watch to disabled
             ui.elements.geolocation_watch.set(&false);
             let _ = ui
                 .elements
@@ -814,10 +773,7 @@ impl Ui {
             let action = match ui.elements.recorder_button.text_content().as_deref() {
                 Some("Record") => maia_json::RecorderStateChange::Start,
                 Some("Stop") => maia_json::RecorderStateChange::Stop,
-                Some("Stopping") => {
-                    // ignore click
-                    return JsValue::NULL;
-                }
+                Some("Stopping") => return JsValue::NULL,
                 content => {
                     web_sys::console::error_1(
                         &format!("recorder_button has unexpecte text_content: {content:?}").into(),
@@ -882,7 +838,6 @@ impl Ui {
 
 // Spectrometer methods
 impl Ui {
-
     impl_section!(
         spectrometer,
         maia_json::Spectrometer,
@@ -894,12 +849,9 @@ impl Ui {
         kurt_enable,
         port_select,
         lpf_select,
-        freq_profile       
-        //sweep_enable
+        freq_profile
     );
 
-    // This function fakes an onchange event for the spectrometer_rate in order
-    // to update the spectrometer settings maintaining the current rate.
     fn update_spectrometer_settings(&self) -> Result<(), JsValue> {
         self.elements
             .spectrometer_integrations_exp
@@ -918,9 +870,7 @@ impl Ui {
             .spectrometer_kurt_thresh
             .set_text_content(Some(&format!("{:.6}", total)));
     }
-
 }
-
 
 #[derive(serde::Serialize, Clone)]
 struct FileHeader {
@@ -941,8 +891,6 @@ impl Ui {
         let st = self.api_state.borrow();
         let s = st.as_ref()?;
 
-
-        // Try to read all 8 profile inputs (Hz). If any is None, we'll omit the field.
         let freq_profiles_hz = match (
             self.elements.fprofile0.get(),
             self.elements.fprofile1.get(),
@@ -959,7 +907,6 @@ impl Ui {
             _ => None,
         };
 
-
         Some(FileHeader {
             sampling_rate_hz: s.ad9361.sampling_frequency,
             rx_bandwidth_hz:  s.ad9361.rx_rf_bandwidth,
@@ -973,13 +920,11 @@ impl Ui {
         })
     }
 
+    // CHANGED: non-consuming stop, no outer RefCell
     fn stop_file_async(&self) {
-        let saver_rc = self.file_save.clone();
+        let saver = self.file_save.clone();
         spawn_local(async move {
-            let mut guard = saver_rc.borrow_mut();
-            // Move out and close once
-            let st = std::mem::take(&mut *guard);
-            let _ = st.stop().await;
+            let _ = saver.stop().await;
         });
     }
 }
@@ -1027,7 +972,6 @@ impl Ui {
         waterfall_max,
         waterfall_show_waterfall,
         waterfall_show_spectrum
-        //waterfall_show_ddc
     );
 
     fn colormap_select_apply(&self, value: colormap::Colormap) {
@@ -1063,7 +1007,6 @@ impl Ui {
     }
 
     fn update_waterfall_rate(&self, json: &maia_json::Spectrometer) {
-          // Estimate input sampling frequency (choose the correct one based on the input)
         let state = self.api_state.borrow();
         let Some(state) = state.as_ref() else {
             web_sys::console::error_1(&"update_waterfall_rate: no api state".into());
@@ -1071,11 +1014,7 @@ impl Ui {
         };
 
         let input_sampling_frequency = state.ad9361.sampling_frequency as f32;
-
-        // FFT length is fixed — confirm from your setup (e.g. 1024 or 2048)
         const FFT_LEN: f32 = 4096.0;
-
-        // Calculate rate = Fs / Nfft / 2^exp
         let rate = input_sampling_frequency / FFT_LEN / (1 << json.integrations_exp) as f32;
 
         self.waterfall
@@ -1084,13 +1023,9 @@ impl Ui {
     }
 }
 
-
 impl Ui {
     /// Parse the 32-byte telemetry footer (TLM1 v1) and update the overlay labels.
-    /// Call this from wherever you handle each waterfall frame, passing the
-    /// *last 32 bytes* of the binary payload.
     pub fn apply_telemetry_footer(&self, footer: &[u8]) {
-        // Expect exactly 32 bytes
         if footer.len() != 32 { return; }
         if &footer[0..4] != b"TLM1" { return; }
         if footer[4] != 1 { return; } // version
@@ -1099,12 +1034,9 @@ impl Ui {
         let gps_valid  = (flags & 0x01) != 0;
         let t_valid    = (flags & 0x02) != 0;
 
-        // Little-endian helpers
         let le_i16 = |i: usize| i16::from_le_bytes([footer[i], footer[i+1]]);
         let le_i32 = |i: usize| i32::from_le_bytes([footer[i], footer[i+1], footer[i+2], footer[i+3]]);
         
-
-        // Temps: centi-°C
         if t_valid {
             let t0_c = le_i16(8)  as f32 / 100.0;
             let t1_c = le_i16(10) as f32 / 100.0;
@@ -1115,12 +1047,10 @@ impl Ui {
             self.elements.tele_temp1.set_text_content(Some("—"));
         }
 
-        // GPS: lat/lon in deg*1e7, alt in mm
         if gps_valid {
             let lat = le_i32(12) as f64 / 1e7;
             let lon = le_i32(16) as f64 / 1e7;
             let alt_m = le_i32(20) as f64 / 1000.0;
-            // let _unix_ms = le_i64(24); // available if you want it
 
             let lat_s = format!("{:.6}°{}", lat.abs(), if lat >= 0.0 { "N" } else { "S" });
             let lon_s = format!("{:.6}°{}", lon.abs(), if lon >= 0.0 { "E" } else { "W" });
@@ -1137,28 +1067,16 @@ impl Ui {
     }
 }
 
-
-
 impl Ui {
     /// True while we’re actively writing frames to disk
     pub fn is_recording_enabled(&self) -> bool {
-        self.file_save.borrow().enabled
-    }
-
-    /// Clone the underlying sink object for writing without holding a RefCell borrow.
-    pub fn clone_file_sink(&self) -> Option<js_sys::Object> {
-        // expose via a method on SaveTarget (see file_writer.rs below)
-        self.file_save.borrow().clone_sink_object()
+        // Prefer calling a method; SaveTarget can internally decide how to expose this
+        self.file_save.is_enabled()
     }
 }
 
-
 // Frequency profile logic
 impl Ui {
-    /// Enforce the rules:
-    /// 1) Must Apply before enabling sweep.
-    /// 2) Must turn sweep OFF before applying again.
-    
     /// Is the File System Access API present?
     fn file_api_available(&self) -> bool {
         js_sys::Reflect::has(&self.window.as_ref(), &JsValue::from_str("showSaveFilePicker"))
@@ -1183,7 +1101,6 @@ impl Ui {
 
         let dirty = self.freq_profiles_dirty.get();
 
-        // Button label + look
         self.elements
             .sweep_button
             .set_text_content(Some(if sweep_on { "Stop Sweep" } else { "Start Sweep" }));
@@ -1191,14 +1108,9 @@ impl Ui {
             .sweep_button
             .set_class_name(if sweep_on { "sweep_on" } else { "sweep_off" });
 
-        // Rule 1: Can only enable when not dirty; stopping is always allowed.
-        // → Disable button only in the “would turn ON, but dirty” case.
         self.elements.sweep_button.set_disabled(!sweep_on && dirty);
-
-        // Rule 2: Apply disabled while sweeping
         self.elements.fprofile_apply.set_disabled(sweep_on);
     }
-
 
     fn fprofile_mark_dirty_onchange(&self) -> Closure<dyn Fn() -> JsValue> {
         let ui = self.clone();
@@ -1212,7 +1124,6 @@ impl Ui {
     fn sweep_button_onclick(&self) -> wasm_bindgen::closure::Closure<dyn Fn() -> JsValue> {
         let ui = self.clone();
         Closure::new(move || {
-            // Current sweep state from the last /api snapshot
             let sweep_on = ui
                 .api_state
                 .borrow()
@@ -1221,27 +1132,24 @@ impl Ui {
                 .unwrap_or(false);
 
             if !sweep_on {
-                // Turning ON: must have applied profiles first
                 if ui.freq_profiles_dirty.get() {
                     let _ = ui.alert("Apply frequency profiles first.");
                     return JsValue::NULL;
                 }
 
-                // Decide if we can (and should) save to file
                 let can_save = ui.file_api_available() && ui.is_secure_context();
 
                 if can_save {
-                    // Require a chosen output file only when saving is possible
                     if ui.elements.sweep_output_path.get().unwrap_or_default().is_empty() {
                         let _ = ui.alert("Choose an output file first (Browse).");
                         return JsValue::NULL;
                     }
 
-                    // Open file and write JSON header
                     if let Some(header) = ui.make_header() {
                         let ui_open = ui.clone();
+                        // CHANGED: no RefCell borrow across await
+                        let saver = ui_open.file_save.clone();
                         spawn_local(async move {
-                            let mut saver = ui_open.file_save.borrow_mut();
                             if let Err(e) = saver.start_with_header(&header).await {
                                 web_sys::console::error_1(&e);
                                 let _ = ui_open.alert("Failed to open file for writing.");
@@ -1249,18 +1157,15 @@ impl Ui {
                         });
                     }
                 } else {
-                    // Not a secure context / unsupported browser: sweep will run without saving
                     web_sys::console::warn_1(
                         &"File saving disabled (not secure context or API unavailable). Sweep will run without recording."
                             .into(),
                     );
                 }
 
-                // Optional optimistic UI
                 ui.elements.sweep_button.set_text_content(Some("Starting…"));
                 ui.elements.sweep_button.set_disabled(true);
 
-                // PATCH sweep_enable: true
                 let ui2 = ui.clone();
                 future_to_promise(async move {
                     let patch = maia_json::PatchSpectrometer {
@@ -1268,21 +1173,18 @@ impl Ui {
                         ..Default::default()
                     };
                     if let Some(updated) = request::ignore_request_failed(ui2.patch_spectrometer(&patch).await)? {
-                        // Keep local state in sync so the label/disabled rules are correct
                         if let Some(state) = ui2.api_state.borrow_mut().as_mut() {
                             state.spectrometer = updated.clone();
                         }
                         ui2.update_spectrometer_inactive_elements(&updated)?;
                         ui2.update_profile_sweep_controls();
                     } else {
-                        // Request failed or ignored → revert UI
                         ui2.update_profile_sweep_controls();
                     }
                     Ok(JsValue::NULL)
                 })
                 .into()
             } else {
-                // Turning OFF is always allowed
                 ui.elements.sweep_button.set_text_content(Some("Stopping…"));
                 ui.elements.sweep_button.set_disabled(true);
 
@@ -1296,9 +1198,7 @@ impl Ui {
                         if let Some(state) = ui2.api_state.borrow_mut().as_mut() {
                             state.spectrometer = updated.clone();
                         }
-                        // Rule 2: require re-Apply before the next ON
                         ui2.freq_profiles_dirty.set(true);
-
                         ui2.update_spectrometer_inactive_elements(&updated)?;
                         ui2.update_profile_sweep_controls();
                     } else {
@@ -1315,14 +1215,9 @@ impl Ui {
         })
     }
 
-
-
-   
-
     fn fprofile_apply_onclick(&self) -> Closure<dyn Fn() -> JsValue> {
         let ui = self.clone();
         Closure::new(move || {
-            // Rule 2: must disengage sweep before applying
             let sweep_on = ui
                 .api_state
                 .borrow()
@@ -1335,7 +1230,6 @@ impl Ui {
                 return JsValue::NULL;
             }
 
-            // Read 8 values (Hz) from MHz inputs via MHzPresentation
             let values_hz: [u64; 8] = match (
                 ui.elements.fprofile0.get(),
                 ui.elements.fprofile1.get(),
@@ -1355,17 +1249,16 @@ impl Ui {
                 }
             };
 
-            // PATCH payload (Hz)
             let payload = serde_json::json!({ "freq_profiles": values_hz });
             let body = JsValue::from_str(&payload.to_string());
 
-            // Build request
             let mut init = web_sys::RequestInit::new();
-            init.method("PATCH");
-            init.body(Some(&body));
+            init.set_method("PATCH");
+            init.set_body(&body); // <-- no Option
             let headers = web_sys::Headers::new().unwrap();
             headers.set("Content-Type", "application/json").unwrap();
-            init.headers(&headers);
+            init.set_headers(&headers);
+
 
             let request = match web_sys::Request::new_with_str_and_init(SPECTROMETER_URL, &init) {
                 Ok(r) => r,
@@ -1375,7 +1268,6 @@ impl Ui {
                 }
             };
 
-            // Send, parse, refresh, clear dirty
             let ui2 = ui.clone();
             future_to_promise(async move {
                 let resp_val = JsFuture::from(ui2.window.fetch_with_request(&request)).await?;
@@ -1385,7 +1277,6 @@ impl Ui {
                 ui2.update_spectrometer_inactive_elements(&updated)?;
                 ui2.update_waterfall_rate(&updated);
 
-                // Apply succeeded: allow enabling sweep (until it’s turned on)
                 ui2.freq_profiles_dirty.set(false);
                 ui2.update_profile_sweep_controls();
 
@@ -1394,6 +1285,11 @@ impl Ui {
             .into()
         })
     }
+}
 
-
+impl Ui {
+    /// Get a clonable handle to the file saver (for async writes).
+    pub fn saver(&self) -> std::rc::Rc<crate::file_writer::SaveTarget> {
+        std::rc::Rc::clone(&self.file_save)
+    }
 }
