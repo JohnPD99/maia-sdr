@@ -53,7 +53,7 @@ impl App {
         let telemetry = Telemetry::new();
         telemetry.spawn_inputs("/dev/ttyPS0", 9600, "/dev/i2c-0", 0x48, 0x49, 300);
         
-        let (waterfall_sender, _) = broadcast::channel(16);
+        let (waterfall_sender, _) = broadcast::channel(2048);
         let spectrometer = Spectrometer::new(
             state.clone(),
             interrupt_handler.waiter_spectrometer(),

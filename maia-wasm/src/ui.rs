@@ -10,14 +10,14 @@ use std::{
     cell::{Cell, Ref, RefCell},
     rc::Rc,
 };
-use wasm_bindgen::{JsCast, JsValue, closure::Closure};
-use wasm_bindgen_futures::{JsFuture, future_to_promise, spawn_local};
+use wasm_bindgen::{closure::Closure, JsCast, JsValue};
+use wasm_bindgen_futures::{future_to_promise, spawn_local, JsFuture};
 use web_sys::{
     Document, Geolocation, HtmlButtonElement, HtmlDialogElement, HtmlElement, HtmlInputElement,
     HtmlParagraphElement, HtmlSelectElement, HtmlSpanElement, PositionOptions, Response, Window,
 };
 
-use crate::file_writer::SaveTarget; // updated writer
+use crate::file_writer::SaveTarget; // updated writer with queue/batching
 use crate::render::RenderEngine;
 use crate::waterfall::Waterfall;
 
@@ -41,6 +41,9 @@ const RECORDING_METADATA_URL: &str = "/api/recording/metadata";
 const SPECTROMETER_URL: &str = "/api/spectrometer";
 const TIME_URL: &str = "/api/time";
 
+/// Waterfall UI max refresh rate (FPS) to avoid starving I/O at high data rates.
+const MAX_UI_FPS: f32 = 30.0;
+
 /// User interface.
 ///
 /// This structure is used to create and set up the appropriate callbacks that
@@ -57,7 +60,7 @@ pub struct Ui {
     render_engine: Rc<RefCell<RenderEngine>>,
     waterfall: Rc<RefCell<Waterfall>>,
     freq_profiles_dirty: Rc<Cell<bool>>, // true => must Apply before enabling sweep
-    // CHANGED: no outer RefCell; SaveTarget provides interior mutability + locking
+    // SaveTarget has interior mutability + async writer task
     file_save: Rc<SaveTarget>,
 }
 
@@ -103,12 +106,12 @@ ui_elements! {
     spectrometer_kurt_thresh: HtmlSpanElement => Rc<HtmlSpanElement>,
     spectrometer_kurt_enable: HtmlInputElement
         => CheckboxInput,
-    spectrometer_port_select: HtmlSelectElement 
+    spectrometer_port_select: HtmlSelectElement
         => EnumInput<u32>,
-    spectrometer_lpf_select: HtmlSelectElement 
+    spectrometer_lpf_select: HtmlSelectElement
         => EnumInput<bool>,
     spectrometer_freq_profile: HtmlInputElement
-        => NumberInput<u32, input::IntegerPresentation>,    
+        => NumberInput<u32, input::IntegerPresentation>,
     recording_metadata_filename: HtmlInputElement => TextInput,
     recorder_prepend_timestamp: HtmlInputElement => CheckboxInput,
     recording_metadata_description: HtmlInputElement => TextInput,
@@ -174,7 +177,6 @@ impl Ui {
             render_engine,
             waterfall,
             freq_profiles_dirty: Rc::new(Cell::new(true)), // must Apply before first sweep
-            // CHANGED
             file_save: Rc::new(SaveTarget::new()),
         };
         ui.elements
@@ -290,7 +292,7 @@ impl Ui {
                 let suggested = ui2.elements.recording_metadata_filename.get()
                     .unwrap_or_else(|| "waterfall.wfall".to_string());
 
-                // CHANGED: no RefCell borrow held across await
+                // No RefCell borrow across await
                 let saver = ui2.file_save.clone();
                 match saver.browse(&suggested).await {
                     Ok(()) => ui2.elements.sweep_output_path.set(&suggested),
@@ -365,19 +367,30 @@ impl Ui {
 
     async fn get_api_update_elements(&self) -> Result<(), JsValue> {
         let json = self.get_api().await?;
+        let sweep_on = json.spectrometer.sweep_enable;
+
+        // Always keep a minimal set fresh
         self.api_state.replace(Some(json.clone()));
-        self.update_ad9361_inactive_elements(&json.ad9361)?;
-        self.update_spectrometer_inactive_elements(&json.spectrometer)?;
+        self.update_recorder_button(&json.recorder);
         self.update_profile_sweep_controls();
         self.update_waterfall_rate(&json.spectrometer);
+
+        if sweep_on {
+            // During recording at high rate, avoid nonessential DOM churn.
+            // (We still keep spectrometer rate & recorder button up to date above.)
+            return Ok(());
+        }
+
+        // Full set of updates when idle / not sweeping
+        self.update_ad9361_inactive_elements(&json.ad9361)?;
+        self.update_spectrometer_inactive_elements(&json.spectrometer)?;
         self.update_kurtosis_label(json.spectrometer.kurt_1, json.spectrometer.kurt_2);
-        self.update_recorder_button(&json.recorder);
         self.update_recording_metadata_inactive_elements(&json.recording_metadata)?;
         self.update_recorder_inactive_elements(&json.recorder)?;
         self.update_geolocation_elements(&json.geolocation)?;
         self.update_versions_elements(&json.versions);
 
-        // Do this last; may PATCH server time
+        // Do this last; may PATCH server time (skip when sweeping to avoid extra traffic)
         self.update_server_time(&json.time).await?;
         Ok(())
     }
@@ -920,7 +933,7 @@ impl Ui {
         })
     }
 
-    // CHANGED: non-consuming stop, no outer RefCell
+    // Non-consuming stop
     fn stop_file_async(&self) {
         let saver = self.file_save.clone();
         spawn_local(async move {
@@ -1015,7 +1028,12 @@ impl Ui {
 
         let input_sampling_frequency = state.ad9361.sampling_frequency as f32;
         const FFT_LEN: f32 = 4096.0;
-        let rate = input_sampling_frequency / FFT_LEN / (1 << json.integrations_exp) as f32;
+        let mut rate = input_sampling_frequency / FFT_LEN / (1 << json.integrations_exp) as f32;
+
+        // Cap UI refresh so rendering can't monopolize the event loop
+        if rate > MAX_UI_FPS {
+            rate = MAX_UI_FPS;
+        }
 
         self.waterfall
             .borrow_mut()
@@ -1070,7 +1088,6 @@ impl Ui {
 impl Ui {
     /// True while we’re actively writing frames to disk
     pub fn is_recording_enabled(&self) -> bool {
-        // Prefer calling a method; SaveTarget can internally decide how to expose this
         self.file_save.is_enabled()
     }
 }
@@ -1137,24 +1154,13 @@ impl Ui {
                     return JsValue::NULL;
                 }
 
+                // Pre-flight checks
                 let can_save = ui.file_api_available() && ui.is_secure_context();
 
                 if can_save {
                     if ui.elements.sweep_output_path.get().unwrap_or_default().is_empty() {
                         let _ = ui.alert("Choose an output file first (Browse).");
                         return JsValue::NULL;
-                    }
-
-                    if let Some(header) = ui.make_header() {
-                        let ui_open = ui.clone();
-                        // CHANGED: no RefCell borrow across await
-                        let saver = ui_open.file_save.clone();
-                        spawn_local(async move {
-                            if let Err(e) = saver.start_with_header(&header).await {
-                                web_sys::console::error_1(&e);
-                                let _ = ui_open.alert("Failed to open file for writing.");
-                            }
-                        });
                     }
                 } else {
                     web_sys::console::warn_1(
@@ -1166,8 +1172,26 @@ impl Ui {
                 ui.elements.sweep_button.set_text_content(Some("Starting…"));
                 ui.elements.sweep_button.set_disabled(true);
 
+                // Single async flow:
+                // 1) open file + start writer (await)  2) enable sweep  3) refresh UI state
                 let ui2 = ui.clone();
                 future_to_promise(async move {
+                    if can_save {
+                        if let Some(header) = ui2.make_header() {
+                            // Await writer readiness BEFORE enabling sweep to avoid early drops
+                            if let Err(e) = ui2.file_save.start_with_header(&header).await {
+                                web_sys::console::error_1(&e);
+                                let _ = ui2.alert("Failed to open file for writing.");
+                                // Re-enable button & keep sweep off
+                                ui2.update_profile_sweep_controls();
+                                ui2.elements.sweep_button.set_text_content(Some("Start Sweep"));
+                                ui2.elements.sweep_button.set_disabled(false);
+                                return Ok(JsValue::NULL);
+                            }
+                        }
+                    }
+
+                    // Now safe to enable sweep
                     let patch = maia_json::PatchSpectrometer {
                         sweep_enable: Some(true),
                         ..Default::default()
@@ -1177,10 +1201,10 @@ impl Ui {
                             state.spectrometer = updated.clone();
                         }
                         ui2.update_spectrometer_inactive_elements(&updated)?;
-                        ui2.update_profile_sweep_controls();
-                    } else {
-                        ui2.update_profile_sweep_controls();
                     }
+
+                    ui2.update_profile_sweep_controls();
+                    ui2.elements.sweep_button.set_disabled(false);
                     Ok(JsValue::NULL)
                 })
                 .into()
@@ -1200,14 +1224,14 @@ impl Ui {
                         }
                         ui2.freq_profiles_dirty.set(true);
                         ui2.update_spectrometer_inactive_elements(&updated)?;
-                        ui2.update_profile_sweep_controls();
-                    } else {
-                        ui2.update_profile_sweep_controls();
                     }
+
+                    ui2.update_profile_sweep_controls();
 
                     // Close the file if we had opened one (no-op if not)
                     ui2.stop_file_async();
 
+                    ui2.elements.sweep_button.set_disabled(false);
                     Ok(JsValue::NULL)
                 })
                 .into()
@@ -1254,11 +1278,10 @@ impl Ui {
 
             let mut init = web_sys::RequestInit::new();
             init.set_method("PATCH");
-            init.set_body(&body); // <-- no Option
+            init.set_body(&body);
             let headers = web_sys::Headers::new().unwrap();
             headers.set("Content-Type", "application/json").unwrap();
             init.set_headers(&headers);
-
 
             let request = match web_sys::Request::new_with_str_and_init(SPECTROMETER_URL, &init) {
                 Ok(r) => r,
