@@ -145,14 +145,6 @@ impl RecordingMeta {
     }
 
     async fn update_for_new_recording(&mut self, state: &AppState) -> Result<()> {
-        if let Some(geolocation) = state.geolocation().lock().unwrap().as_ref() {
-            // It is assumed that the geolocation has been validated, so it
-            // should not error when converting to a GeoJSON point.
-            self.sigmf_meta
-                .set_geolocation(geolocation.clone().try_into().unwrap())
-        } else {
-            self.sigmf_meta.remove_geolocation();
-        }
         self.sigmf_meta.set_datetime_now();
 
         if let Some(duration) = self.maximum_duration {
@@ -203,9 +195,6 @@ impl RecordingMeta {
             filename: self.filename.clone(),
             description: self.sigmf_meta.description().to_string(),
             author: self.sigmf_meta.author().to_string(),
-            geolocation: maia_json::DeviceGeolocation {
-                point: self.sigmf_meta.geolocation().map(|g| g.into()),
-            },
         }
     }
 
@@ -230,10 +219,6 @@ impl RecordingMeta {
         }
         if let Some(author) = patch.author {
             self.sigmf_meta.set_author(&author);
-        }
-        if let Some(geolocation) = patch.geolocation {
-            self.sigmf_meta
-                .set_geolocation_optional(geolocation.point.map(|g| g.try_into()).transpose()?);
         }
         Ok(())
     }

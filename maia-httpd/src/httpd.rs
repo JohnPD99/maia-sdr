@@ -20,8 +20,6 @@ use tower_http::{
 
 mod ad9361;
 mod api;
-//mod ddc;
-mod geolocation;
 mod iqengine;
 mod recording;
 mod spectrometer;
@@ -80,10 +78,6 @@ impl Server {
             .route(
                 "/api/spectrometer",
                 get(spectrometer::get_spectrometer).patch(spectrometer::patch_spectrometer),
-            )
-            .route(
-                "/api/geolocation",
-                get(geolocation::get_geolocation).put(geolocation::put_geolocation),
             )
             .route(
                 "/api/recorder",

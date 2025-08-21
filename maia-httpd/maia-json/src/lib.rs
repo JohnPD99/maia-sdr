@@ -12,8 +12,6 @@ use serde::{Deserialize, Serialize};
 pub struct Api {
     /// AD9361 settings.
     pub ad9361: Ad9361,
-    /// Device geolocation.
-    pub geolocation: DeviceGeolocation,
     /// IQ recorder settings.
     pub recorder: Recorder,
     /// Metadata for the current recording.
@@ -340,11 +338,6 @@ pub struct RecordingMetadata {
     pub description: String,
     /// Recording author.
     pub author: String,
-    /// Recording geolocation.
-    ///
-    /// This corresponds to the SigMF "core:geolocation" key. It contains `None`
-    /// if the geolocation is unknown.
-    pub geolocation: DeviceGeolocation,
 }
 
 /// Recording metadata PATCH JSON schema.
@@ -363,13 +356,6 @@ pub struct PatchRecordingMetadata {
     /// Recording author.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
-    /// Recording geolocation.
-    ///
-    /// This corresponds to the SigMF "core:geolocation" key. It contains `None`
-    /// inside the `DeviceGeolocation` to remove the geolocation from the
-    /// metadata.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub geolocation: Option<DeviceGeolocation>,
 }
 
 impl From<RecordingMetadata> for PatchRecordingMetadata {
@@ -379,8 +365,7 @@ impl From<RecordingMetadata> for PatchRecordingMetadata {
             val,
             filename,
             description,
-            author,
-            geolocation
+            author
         )
     }
 }
@@ -414,19 +399,6 @@ impl From<Time> for PatchTime {
     fn from(val: Time) -> PatchTime {
         get_fields!(PatchTime, val, time)
     }
-}
-
-/// Device geolocation JSON schema.
-///
-/// This JSON schema corresponds to GET and PUT requests on
-/// `/api/geolocation`. The GET request contains the current device geolocation,
-/// or `None` if it has never been set or if it has been cleared. The PUT
-/// request sets the current device geolocation, or clears it the request
-/// contains `None`.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
-pub struct DeviceGeolocation {
-    /// Current device geolocation.
-    pub point: Option<Geolocation>,
 }
 
 /// Versions information.
