@@ -67,7 +67,6 @@ ui_elements! {
     waterfall_show_waterfall: HtmlInputElement => CheckboxInput,
     waterfall_show_spectrum: HtmlInputElement => CheckboxInput,
     recorder_button: HtmlButtonElement => Rc<HtmlButtonElement>,
-    recorder_button_replica: HtmlButtonElement => Rc<HtmlButtonElement>,
     settings_button: HtmlButtonElement => Rc<HtmlButtonElement>,
     alert_dialog: HtmlDialogElement => Rc<HtmlDialogElement>,
     alert_message: HtmlParagraphElement => Rc<HtmlParagraphElement>,
@@ -230,9 +229,6 @@ impl Ui {
             sweep_button,
             sweep_browse
         );
-        self.elements
-            .recorder_button_replica
-            .set_onclick(self.elements.recorder_button.onclick().as_ref());
 
         let mark_dirty = self.fprofile_mark_dirty_onchange();
         let f: &js_sys::Function = mark_dirty.as_ref().unchecked_ref();
@@ -519,20 +515,20 @@ impl Ui {
 
     fn update_recorder_button(&self, json: &maia_json::Recorder) {
         let text = match json.state {
-            maia_json::RecorderState::Stopped => "Record",
-            maia_json::RecorderState::Running => "Stop",
+            maia_json::RecorderState::Stopped  => "Record",
+            maia_json::RecorderState::Running  => "Stop",
             maia_json::RecorderState::Stopping => "Stopping",
         };
-        for button in [
-            &self.elements.recorder_button,
-            &self.elements.recorder_button_replica,
-        ] {
-            if button.inner_html() != text {
-                button.set_text_content(Some(text));
-                button.set_class_name(&format!("{}_button", text.to_lowercase()));
-            }
+
+        let button = &self.elements.recorder_button;
+
+        if button.inner_html() != text {
+            button.set_text_content(Some(text));
+            let class = format!("{}_button", text.to_lowercase());
+            button.set_class_name(&class);
         }
     }
+
 
     fn patch_recorder_promise(&self, patch: maia_json::PatchRecorder) -> JsValue {
         let ui = self.clone();

@@ -1,24 +1,24 @@
 {
-    "short_name": "Maia SDR",
-    "name": "Maia SDR",
+    "short_name": "turfRad Whisper",
+    "name": "turfRad Whisper",
     "icons": [
         {
-            "src:": "/maia-icon-32x32.png",
+            "src:": "/favicon32x32_turfRad.png",
             "type": "image/png",
             "sizes": "32x32"
         },
         {
-            "src:": "/maia-icon-128x128.png",
+            "src:": "/favicon128x128_turfRad.png",
             "type": "image/png",
             "sizes": "128x128"
         },
         {
-            "src:": "/maia-icon-180x180.png",
+            "src:": "/favicon180x180_turfRad.png",
             "type": "image/png",
             "sizes": "180x180"
         },
         {
-            "src:": "/maia-icon-192x192.png",
+            "src:": "/favicon192x192_turfRad.png",
             "type": "image/png",
             "sizes": "192x192"
         }

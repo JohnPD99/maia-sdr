@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
-    <title>Maia SDR</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="/maia-icon-32x32.png">
-    <link rel="icon" type="image/png" sizes="128x128" href="/maia-icon-128x128.png">
-    <link rel="icon" type="image/png" sizes="180x180" href="/maia-icon-180x180.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/maia-icon-192x192.png">
-    <link rel="apple-touch-icon" type="image/png" sizes="32x32" href="/maia-icon-32x32.png">
-    <link rel="apple-touch-icon" type="image/png" sizes="128x128" href="/maia-icon-128x128.png">
-    <link rel="apple-touch-icon" type="image/png" sizes="180x180" href="/maia-icon-180x180.png">
-    <link rel="apple-touch-icon" type="image/png" sizes="192x192" href="/maia-icon-192x192.png">
+    <title>TerraRad Whisper</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon32x32_turfRad.png">
+    <link rel="icon" type="image/png" sizes="128x128" href="/favicon128x128_turfRad.png">
+    <link rel="icon" type="image/png" sizes="180x180" href="/favicon180x180_turfRad.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon192x192_turfRad.png">
+    <link rel="apple-touch-icon" type="image/png" sizes="32x32" href="/favicon32x32_turfRad.png">
+    <link rel="apple-touch-icon" type="image/png" sizes="128x128" href="/favicon128x128_turfRad.png">
+    <link rel="apple-touch-icon" type="image/png" sizes="180x180" href="/favicon180x180_turfRad.png">
+    <link rel="apple-touch-icon" type="image/png" sizes="192x192" href="/favicon192x192_turfRad.png">
     <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="./style.css">
     <script type="module" src="./index.js"></script>
@@ -26,10 +26,10 @@
     <dialog class="ui" id="settings">
         <div id="settings_tabs" role="tablist">
           <button id="recording_tab" role="tab" aria-selected="true" aria-controls="recording_panel">
-            Recording
+            IQ Measurement
           </button>
           <button id="measurement_tab" role="tab" aria-selected="false" aria-controls="measurement_panel">
-            Measurement
+            Sweep Measurement
           </button>
           <button id="waterfall_tab" role="tab" aria-selected="false" aria-controls="waterfall_panel">
             Waterfall
@@ -59,7 +59,7 @@
             </select>
             <label for="recorder_maximum_duration">Max duration (s)</label>
             <input type="number" min="0" step="any" id="recorder_maximum_duration">
-            <button type="button" id="recorder_button_replica" class="record_button"></button>
+            <button type="button" id="recorder_button" class="record_button"></button>
             <a id="iqengine_recording" class="link_button" href="/view/api/maiasdr/maiasdr/recording">View in IQEngine</a>
             <a id="download_recording" class="link_button" href="/recording" download>Download recording</a>
           </form>
@@ -212,7 +212,6 @@
         <label>Frequency Profile Selection
           <input type="number" id="spectrometer_freq_profile" step="1" min="0">
         </label>
-        <button type="button" id="recorder_button" class="record_button"></button>
         <button type="button" id="settings_button">Settings</button>
       </form>
     </div>
